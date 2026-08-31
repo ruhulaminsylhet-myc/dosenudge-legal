@@ -1,0 +1,129 @@
+rules_version = '2';
+
+// RBAC model:
+//  - Custom claims set server-side by Cloud Functions: { admin: true } and { role: 'driver' | 'rider' }
+//  - Clients can never grant themselves a role; all privileged transitions go through callable functions.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isDriver() {
+      return signedIn() && request.auth.token.role == 'driver';
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+
+      // Self-registration: role must be rider or driver, status starts 'active',
+      // and the client can never write privileged fields.
+      allow create: if isSelf(uid)
+        && request.resource.data.role in ['rider', 'driver']
+        && request.resource.data.status == 'active';
+
+      // Self-update: cannot change own role or status (admin-only levers).
+      allow update: if (isSelf(uid)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status)
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- drivers ----------
+    match /drivers/{uid} {
+      // Riders need to see assigned-driver name/vehicle/location during a ride.
+      allow read: if signedIn();
+
+      // Driver creates own profile; approval always starts 'pending'.
+      allow create: if isSelf(uid)
+        && request.resource.data.approvalStatus == 'pending';
+
+      // Driver may update own doc but can never touch approvalStatus,
+      // rating or lifetime counters (server/admin-owned fields).
+      allow update: if (isSelf(uid)
+          && request.resource.data.approvalStatus == resource.data.approvalStatus
+          && request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
+          && request.resource.data.get('totalRides', 0) == resource.data.get('totalRides', 0)
+          && request.resource.data.get('totalEarnings', 0) == resource.data.get('totalEarnings', 0))
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- rides ----------
+    match /rides/{rideId} {
+      function isParticipant() {
+        return signedIn()
+          && (resource.data.riderId == request.auth.uid
+              || resource.data.driverId == request.auth.uid);
+      }
+
+      allow read: if isParticipant() || isAdmin()
+        // Approved online drivers must be able to read open requests offered to them.
+        || (isDriver() && resource.data.status == 'requested');
+
+      // Rider creates a ride request for themself, always starting at 'requested'.
+      allow create: if signedIn()
+        && request.resource.data.riderId == request.auth.uid
+        && request.resource.data.status == 'requested'
+        && request.resource.data.driverId == null;
+
+      // Allowed client-side transitions; everything else (fares, earnings,
+      // notifications) is enforced by Cloud Functions triggers.
+      allow update: if isAdmin()
+        // Driver claims an open request (atomic: only if still unassigned).
+        || (isDriver()
+            && resource.data.status == 'requested'
+            && resource.data.driverId == null
+            && request.resource.data.driverId == request.auth.uid
+            && request.resource.data.status == 'accepted'
+            && request.resource.data.riderId == resource.data.riderId)
+        // Assigned driver advances the trip.
+        || (signedIn()
+            && resource.data.driverId == request.auth.uid
+            && request.resource.data.driverId == resource.data.driverId
+            && request.resource.data.riderId == resource.data.riderId
+            && ((resource.data.status == 'accepted' && request.resource.data.status in ['arrived', 'cancelled'])
+              || (resource.data.status == 'arrived' && request.resource.data.status == 'in_progress')
+              || (resource.data.status == 'in_progress' && request.resource.data.status == 'completed')))
+        // Rider cancels before pickup.
+        || (signedIn()
+            && resource.data.riderId == request.auth.uid
+            && request.resource.data.riderId == resource.data.riderId
+            && resource.data.status in ['requested', 'accepted', 'arrived']
+            && request.resource.data.status == 'cancelled');
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- earnings ledger (server-written only) ----------
+    match /earnings/{entryId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.driverId == request.auth.uid);
+      allow write: if false; // Cloud Functions (Admin SDK) only
+    }
+
+    // ---------- platform config (pricing etc.) ----------
+    match /config/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Default deny.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
