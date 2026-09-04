@@ -69,13 +69,33 @@ class RideScreen extends StatelessWidget {
                 if (ride.driverInfo != null) ...[
                   const SizedBox(height: 12),
                   Card(
-                    child: ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(ride.driverInfo!.name),
-                      subtitle: Text(ride.driverInfo!.vehicleLabel),
-                      trailing: ride.driverInfo!.ratingCount > 0
-                          ? Text('${ride.driverInfo!.rating.toStringAsFixed(1)} ⭐')
-                          : null,
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const CircleAvatar(child: Icon(Icons.person)),
+                          title: Text(ride.driverInfo!.name),
+                          subtitle: Text(ride.driverInfo!.vehicleLabel),
+                          trailing: ride.driverInfo!.ratingCount > 0
+                              ? Text(
+                                  '${ride.driverInfo!.rating.toStringAsFixed(1)} ⭐')
+                              : null,
+                        ),
+                        if (ride.driverInfo!.phone != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.phone),
+                                label: Text(t.callDriver),
+                                onPressed: () => launchUrl(Uri(
+                                  scheme: 'tel',
+                                  path: ride.driverInfo!.phone,
+                                )),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],

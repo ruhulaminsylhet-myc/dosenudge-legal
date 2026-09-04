@@ -12,6 +12,10 @@ class ActiveRidePanel extends StatelessWidget {
 
   final Ride ride;
 
+  Future<void> _call(String phone) async {
+    await launchUrl(Uri(scheme: 'tel', path: phone));
+  }
+
   Future<void> _navigateTo(RidePoint point) async {
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1'
@@ -81,6 +85,14 @@ class ActiveRidePanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          if (ride.riderPhone != null) ...[
+            OutlinedButton.icon(
+              icon: const Icon(Icons.phone),
+              label: Text(t.callRider),
+              onPressed: () => _call(ride.riderPhone!),
+            ),
+            const SizedBox(height: 8),
+          ],
           OutlinedButton.icon(
             icon: const Icon(Icons.navigation_outlined),
             label: Text(ride.status == 'in_progress'

@@ -123,11 +123,15 @@ class DriverInfo {
   final double rating;
   final int ratingCount;
 
+  /// Present only while the ride is live; cleared when it finishes.
+  final String? phone;
+
   const DriverInfo({
     required this.name,
     required this.vehicleLabel,
     required this.rating,
     required this.ratingCount,
+    required this.phone,
   });
 
   static DriverInfo? fromMap(Map<String, dynamic>? m) {
@@ -137,6 +141,7 @@ class DriverInfo {
       vehicleLabel: (m['vehicleLabel'] ?? '') as String,
       rating: ((m['rating'] ?? 0) as num).toDouble(),
       ratingCount: ((m['ratingCount'] ?? 0) as num).toInt(),
+      phone: m['phone'] as String?,
     );
   }
 }

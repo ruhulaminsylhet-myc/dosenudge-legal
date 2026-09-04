@@ -106,13 +106,19 @@ export interface RideDoc {
   rating?: number;
   /** Set once the rider starts checkout; only the webhook marks it paid. */
   payment?: RidePayment;
-  /** Denormalised driver fields the rider may see; written on accept. */
+  /**
+   * Denormalised driver fields the rider may see; written on accept and, for
+   * the phone number, removed again once the ride reaches a terminal state.
+   */
   driverInfo?: {
     name: string;
     vehicleLabel: string;
     rating: number;
     ratingCount: number;
+    phone?: string;
   } | null;
+  /** Rider's number, so the driver can call at pickup. Removed with the above. */
+  riderPhone?: string;
 }
 
 export interface PricingConfig {

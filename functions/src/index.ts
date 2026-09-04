@@ -163,7 +163,8 @@ export const onRideUpdated = onDocumentUpdated("rides/{rideId}", async (event) =
   const ref = event.data!.after.ref;
 
   const riderSnap = await db().doc(`users/${after.riderId}`).get();
-  const riderToken = (riderSnap.data() as UserDoc | undefined)?.fcmToken;
+  const rider = riderSnap.data() as UserDoc | undefined;
+  const riderToken = rider?.fcmToken;
 
   switch (after.status) {
     case "accepted": {
@@ -172,17 +173,22 @@ export const onRideUpdated = onDocumentUpdated("rides/{rideId}", async (event) =
       const vehicle = driver
         ? `${driver.vehicle.color} ${driver.vehicle.make} ${driver.vehicle.model} (${driver.vehicle.plate})`
         : "your driver";
-      // Copy the handful of driver fields the rider is entitled to see onto the
-      // ride itself, so the rider app never reads the drivers collection (which
-      // also holds phone numbers and live location).
+      // Copy the driver fields the rider is entitled to see onto the ride, so
+      // the rider app never reads the drivers collection (which also holds live
+      // location). Both parties also need to reach each other between accept
+      // and drop-off — a driver at the pickup with no way to call the rider is
+      // a failed pickup — so the numbers ride along for exactly that window and
+      // are deleted when it closes.
       await ref.update({
         acceptedAt: FieldValue.serverTimestamp(),
+        riderPhone: rider?.phone ?? FieldValue.delete(),
         driverInfo: driver
           ? {
               name: driver.name,
               vehicleLabel: vehicle,
               rating: driver.rating ?? 0,
               ratingCount: driver.ratingCount ?? 0,
+              phone: driver.phone,
             }
           : null,
       });
@@ -207,6 +213,7 @@ export const onRideUpdated = onDocumentUpdated("rides/{rideId}", async (event) =
     }
     case "completed": {
       await settleRide(rideId, after, ref);
+      await clearContactDetails(ref);
       await sendPush(riderToken, {
         title: "Trip completed",
         body: "Thanks for riding with us. Rate your trip in the app.",
@@ -228,12 +235,27 @@ export const onRideUpdated = onDocumentUpdated("rides/{rideId}", async (event) =
         body: "Your ride has been cancelled.",
         data: { type: "ride_cancelled", rideId },
       });
+      await clearContactDetails(ref);
       break;
     }
     default:
       break;
   }
 });
+
+/**
+ * Phone numbers live on a ride only while it is in flight. Once it is finished
+ * or cancelled, neither party needs the other's number, so it stops being
+ * stored — the ride history keeps the trip, not the contact details.
+ */
+async function clearContactDetails(
+  ref: FirebaseFirestore.DocumentReference
+): Promise<void> {
+  await ref.update({
+    riderPhone: FieldValue.delete(),
+    "driverInfo.phone": FieldValue.delete(),
+  });
+}
 
 async function settleRide(
   rideId: string,

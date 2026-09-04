@@ -74,6 +74,7 @@ class Strings {
   String get rideCancelled => _('Ride cancelled', 'যাত্রা বাতিল');
   String get noDriversFound =>
       _('No drivers found', 'কোনো ড্রাইভার পাওয়া যায়নি');
+  String get callDriver => _('Call driver', 'ড্রাইভারকে ফোন করুন');
   String get cancelRide => _('Cancel ride', 'যাত্রা বাতিল করুন');
   String get done => _('Done', 'সম্পন্ন');
 

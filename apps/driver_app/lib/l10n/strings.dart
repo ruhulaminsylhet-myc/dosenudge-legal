@@ -155,6 +155,7 @@ class Strings {
         'বারবার বাতিল করলে আপনার রেটিং-এ প্রভাব পড়ে।',
       );
   String get keepRide => _('Keep ride', 'যাত্রা রাখুন');
+  String get callRider => _('Call rider', 'যাত্রীকে ফোন করুন');
   String riderName(String name) => _('Rider: $name', 'যাত্রী: $name');
 
   // Earnings & payouts

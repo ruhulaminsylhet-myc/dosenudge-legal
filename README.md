@@ -21,10 +21,12 @@ A complete three-tier ride-hailing MVP:
   (live GPS + geohash), receive nearby ride offers via push, accept atomically,
   drive the trip through `accepted → arrived → in_progress → completed`, and see earnings.
   The trip is metered by GPS, so the fare reflects the route actually driven.
-- **Admin (you)** reviews driver documents before approving/rejecting,
-  suspends/reactivates any user (kills their session everywhere), watches live
-  rides, and edits pricing, commission %, and dispatch settings — all changes
-  take effect immediately.
+  Rider and driver can call each other while a trip is live; the numbers are
+  removed from the ride once it ends.
+- **Admin (you)** sees the commission you've earned (7-day and all-time),
+  reviews driver documents before approving/rejecting, suspends/reactivates any
+  user (kills their session everywhere), watches live rides, and edits pricing,
+  commission %, and dispatch settings — all changes take effect immediately.
 - **Server** matches each request to the nearest online approved drivers
   (geohash radius query), computes fares from `config/pricing`, settles
   completed trips into an earnings ledger, sends all push notifications, and

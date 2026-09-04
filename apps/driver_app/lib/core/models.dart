@@ -153,6 +153,9 @@ class Ride {
   final Fare? finalFare;
   final Timestamp? requestedAt;
 
+  /// Present only while the ride is live; cleared when it finishes.
+  final String? riderPhone;
+
   const Ride({
     required this.id,
     required this.riderId,
@@ -165,6 +168,7 @@ class Ride {
     required this.fareEstimate,
     required this.finalFare,
     required this.requestedAt,
+    required this.riderPhone,
   });
 
   factory Ride.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -182,6 +186,7 @@ class Ride {
       fareEstimate: Fare.fromMap(d['fareEstimate'] as Map<String, dynamic>?),
       finalFare: Fare.fromMap(d['finalFare'] as Map<String, dynamic>?),
       requestedAt: d['requestedAt'] as Timestamp?,
+      riderPhone: d['riderPhone'] as String?,
     );
   }
 

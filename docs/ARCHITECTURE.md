@@ -63,6 +63,10 @@ plus `cancelled` (rider/driver/admin/system) আর `expired` (timeout এ ক�
 - একটা open ride request শুধু **যে driver দের offer করা হয়েছে** (`offeredTo`
   array) তারাই পড়তে ও accept করতে পারে। তাই London-এর driver Manchester-এর
   rider-এর address কখনো দেখবে না — rules আর app query দুই জায়গাতেই enforce করা।
+- **ফোন নম্বর শুধু যাত্রা চলাকালীন।** Accept হলে দুই পক্ষের নম্বর ride doc-এ
+  copy হয় (driver pickup-এ পৌঁছে rider-কে ফোন করতে পারতে হবে), আর যাত্রা
+  শেষ/বাতিল হলে function সেগুলো **মুছে দেয়**। তাই পুরনো ride history-তে কারো
+  নম্বর জমে থাকে না — যতটুকু সময় দরকার ততটুকুই থাকে।
 
 ## 4. Dispatch engine (driver matching)
 
@@ -185,7 +189,9 @@ rules এ check হয়), আর privileged action গুলোতে callable
 (`adminSetDriverApproval`, `adminSetUserStatus`, `adminGrantAdmin`)। ফলে server
 key Vercel এ রাখতে হয় না — attack surface ছোট।
 
-Pages: Dashboard (aggregate counts), Drivers (approve/reject + live online
+Pages: Dashboard (**revenue** — তোমার commission ৭ দিনের ও সর্বকালের, আর
+processed fare — সবই Firestore-এর server-side `sum()` aggregation দিয়ে, তাই
+ledger বড় হলেও browser-এ সব entry টানতে হয় না; সাথে aggregate counts), Drivers (approve/reject + live online
 status), Users (search + suspend/reactivate), Rides (live `onSnapshot` feed),
 Pricing (config editor)।
 
