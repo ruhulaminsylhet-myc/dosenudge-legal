@@ -32,3 +32,7 @@ apps/*/lib/firebase_options.dart
 .idea/
 .vscode/
 .DS_Store
+
+# Firebase emulator artifacts
+firestore-debug.log
+storage-debug.log

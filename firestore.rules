@@ -85,29 +85,37 @@ service cloud.firestore {
         && request.resource.data.status == 'requested'
         && request.resource.data.driverId == null;
 
+      // Which fields a client may touch at all. Everything else on a ride —
+      // fares, distance, offeredTo, driverInfo, rating, timestamps — is written
+      // only by Cloud Functions. Without this the assigned driver could inflate
+      // estimatedDistanceKm (settlement prices the trip from it) or pre-set
+      // rating to block the rider's review.
+      function changes(allowed) {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+      }
+
       // Allowed client-side transitions; everything else (fares, earnings,
       // notifications) is enforced by Cloud Functions triggers.
       allow update: if isAdmin()
         // Driver claims an open request (atomic: only if still unassigned).
         || (isDriver()
+            && changes(['status', 'driverId'])
             && resource.data.status == 'requested'
             && request.auth.uid in resource.data.offeredTo
             && resource.data.driverId == null
             && request.resource.data.driverId == request.auth.uid
-            && request.resource.data.status == 'accepted'
-            && request.resource.data.riderId == resource.data.riderId)
+            && request.resource.data.status == 'accepted')
         // Assigned driver advances the trip.
         || (signedIn()
+            && changes(['status', 'cancelledBy'])
             && resource.data.driverId == request.auth.uid
-            && request.resource.data.driverId == resource.data.driverId
-            && request.resource.data.riderId == resource.data.riderId
             && ((resource.data.status == 'accepted' && request.resource.data.status in ['arrived', 'cancelled'])
               || (resource.data.status == 'arrived' && request.resource.data.status == 'in_progress')
               || (resource.data.status == 'in_progress' && request.resource.data.status == 'completed')))
         // Rider cancels before pickup.
         || (signedIn()
+            && changes(['status', 'cancelledBy'])
             && resource.data.riderId == request.auth.uid
-            && request.resource.data.riderId == resource.data.riderId
             && resource.data.status in ['requested', 'accepted', 'arrived']
             && request.resource.data.status == 'cancelled');
 

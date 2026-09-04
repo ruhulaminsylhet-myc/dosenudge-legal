@@ -102,6 +102,22 @@ Give the two apps **different bundle ids** (e.g. `com.yourco.taxi.driver` and
 writes `lib/firebase_options.dart`, which is gitignored because it differs per
 environment.
 
+## Tests
+
+Security rules are the main thing standing between a driver and someone else's
+data, so they have their own suite (34 assertions) that runs against the
+Firestore emulator — no project or credentials needed:
+
+```bash
+npm install -g firebase-tools
+cd tests && npm install && npm test
+```
+
+It covers who may read driver profiles and open ride requests, every legal and
+illegal ride-status transition, which fields a client may write on a ride, the
+earnings ledger being server-only, and self-promotion to admin. CI runs it on
+every push.
+
 ## Monthly cost estimate (MVP scale, ~1k rides/month)
 
 | Service | Cost |
