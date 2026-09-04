@@ -34,6 +34,18 @@ class Vehicle {
   String get label => '$color $make $model · $plate';
 }
 
+/// Which verification documents a driver must upload before approval.
+enum DriverDocument {
+  licence('licence', 'Driving licence'),
+  insurance('insurance', 'Insurance certificate'),
+  vehiclePhoto('vehiclePhoto', 'Vehicle photo');
+
+  const DriverDocument(this.key, this.label);
+
+  final String key;
+  final String label;
+}
+
 class DriverProfile {
   final String id;
   final String name;
@@ -46,6 +58,9 @@ class DriverProfile {
   final int totalRides;
   final double totalEarnings;
 
+  /// Uploaded document download URLs, keyed by [DriverDocument.key].
+  final Map<String, String> documents;
+
   const DriverProfile({
     required this.id,
     required this.name,
@@ -57,7 +72,11 @@ class DriverProfile {
     required this.ratingCount,
     required this.totalRides,
     required this.totalEarnings,
+    required this.documents,
   });
+
+  bool get hasAllDocuments =>
+      DriverDocument.values.every((d) => documents.containsKey(d.key));
 
   factory DriverProfile.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
@@ -72,6 +91,9 @@ class DriverProfile {
       ratingCount: ((d['ratingCount'] ?? 0) as num).toInt(),
       totalRides: ((d['totalRides'] ?? 0) as num).toInt(),
       totalEarnings: ((d['totalEarnings'] ?? 0) as num).toDouble(),
+      documents: ((d['documents'] ?? const <String, dynamic>{})
+              as Map<String, dynamic>)
+          .map((k, v) => MapEntry(k, v as String)),
     );
   }
 }

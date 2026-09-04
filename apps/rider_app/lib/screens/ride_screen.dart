@@ -85,6 +85,8 @@ class RideScreen extends StatelessWidget {
                     },
                   ),
                 ],
+                if (ride.status == 'completed' && ride.driverId != null)
+                  _RatingCard(ride: ride),
                 const Spacer(),
                 if (ride.status == 'requested' ||
                     ride.status == 'accepted' ||
@@ -107,6 +109,95 @@ class RideScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _RatingCard extends StatefulWidget {
+  const _RatingCard({required this.ride});
+
+  final Ride ride;
+
+  @override
+  State<_RatingCard> createState() => _RatingCardState();
+}
+
+class _RatingCardState extends State<_RatingCard> {
+  int _selected = 0;
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await RiderService.instance.rateRide(widget.ride.id, _selected);
+      // The ride stream pushes the saved rating back, flipping this card to
+      // its thank-you state.
+    } catch (e) {
+      setState(() => _error = 'Could not save your rating. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final existing = widget.ride.rating;
+    if (existing != null) {
+      return Card(
+        margin: const EdgeInsets.only(top: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green),
+              const SizedBox(width: 8),
+              Text('You rated this trip $existing ⭐'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Rate your driver',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Row(
+              children: List.generate(5, (i) {
+                final value = i + 1;
+                return IconButton(
+                  icon: Icon(
+                    value <= _selected ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                    size: 32,
+                  ),
+                  onPressed: _busy ? null : () => setState(() => _selected = value),
+                );
+              }),
+            ),
+            if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: (_selected == 0 || _busy) ? null : _submit,
+                child: Text(_busy ? 'Saving…' : 'Submit rating'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -44,8 +44,15 @@ export interface DriverDoc {
   ratingCount: number;
   totalRides: number;
   totalEarnings: number;
-  licenceUrl?: string;
+  /** Verification document download URLs, keyed by document type. */
+  documents?: Record<string, string>;
 }
+
+export const DRIVER_DOCUMENT_LABELS: Record<string, string> = {
+  licence: "Licence",
+  insurance: "Insurance",
+  vehiclePhoto: "Vehicle",
+};
 
 export interface Fare {
   currency: string;

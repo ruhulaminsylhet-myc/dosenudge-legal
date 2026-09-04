@@ -14,13 +14,16 @@ A complete three-tier ride-hailing MVP:
 
 ## What the platform does
 
-- **Riders** register, get a fare estimate, request a taxi, track status live, see history.
-- **Drivers** apply with vehicle details, wait for admin approval, go online
+- **Riders** register, get a fare estimate, request a taxi, track status live,
+  rate the driver afterwards, and see their history.
+- **Drivers** apply with vehicle details, upload verification documents
+  (licence, insurance, vehicle photo), wait for admin approval, go online
   (live GPS + geohash), receive nearby ride offers via push, accept atomically,
   drive the trip through `accepted → arrived → in_progress → completed`, and see earnings.
-- **Admin (you)** approves/rejects drivers, suspends/reactivates any user
-  (kills their session everywhere), watches live rides, and edits pricing,
-  commission %, and dispatch settings — all changes take effect immediately.
+- **Admin (you)** reviews driver documents before approving/rejecting,
+  suspends/reactivates any user (kills their session everywhere), watches live
+  rides, and edits pricing, commission %, and dispatch settings — all changes
+  take effect immediately.
 - **Server** matches each request to the nearest online approved drivers
   (geohash radius query), computes fares from `config/pricing`, settles
   completed trips into an earnings ledger, sends all push notifications, and
@@ -110,5 +113,6 @@ iOS: add `NSLocationWhenInUseUsageDescription` to `ios/Runner/Info.plist`.
    commission collected at charge time (currently cash + ledger).
 2. In-app live map (`google_maps_flutter`) + driver ETA.
 3. Actual GPS-metered fares (currently estimated distance + real duration).
-4. Ratings both ways; document upload & verification flow for driver licences.
+4. Driver-rates-rider (rider-rates-driver already ships) and automated
+   document expiry reminders.
 5. Bangla localisation (`intl` is already wired) and bKash for a BD launch.

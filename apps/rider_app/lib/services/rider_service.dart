@@ -149,6 +149,15 @@ class RiderService {
       .doc('rides/$rideId')
       .update({'status': 'cancelled', 'cancelledBy': 'rider'});
 
+  /// Ratings go through a callable: security rules block clients from writing
+  /// the driver's rating average directly.
+  Future<void> rateRide(String rideId, int rating) async {
+    await _functions.httpsCallable('rateRide').call({
+      'rideId': rideId,
+      'rating': rating,
+    });
+  }
+
   Stream<DriverInfo> driverStream(String driverId) =>
       _db.doc('drivers/$driverId').snapshots().map(DriverInfo.fromDoc);
 

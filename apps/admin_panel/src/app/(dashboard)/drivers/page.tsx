@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { callSetDriverApproval, firestore } from "@/lib/firebase";
-import type { ApprovalStatus, DriverDoc } from "@/lib/types";
+import { DRIVER_DOCUMENT_LABELS, type ApprovalStatus, type DriverDoc } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
 export default function DriversPage() {
@@ -68,6 +68,7 @@ export default function DriversPage() {
             <tr>
               <th className="px-4 py-3">Driver</th>
               <th className="px-4 py-3">Vehicle</th>
+              <th className="px-4 py-3">Documents</th>
               <th className="px-4 py-3">Approval</th>
               <th className="px-4 py-3">Online</th>
               <th className="px-4 py-3">Rides</th>
@@ -86,6 +87,25 @@ export default function DriversPage() {
                   {d.vehicle
                     ? `${d.vehicle.color} ${d.vehicle.make} ${d.vehicle.model} · ${d.vehicle.plate}`
                     : "—"}
+                </td>
+                <td className="px-4 py-3">
+                  {d.documents && Object.keys(d.documents).length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(d.documents).map(([key, url]) => (
+                        <a
+                          key={key}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                        >
+                          {DRIVER_DOCUMENT_LABELS[key] ?? key}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-amber-600">None uploaded</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge value={d.approvalStatus} />
@@ -123,7 +143,7 @@ export default function DriversPage() {
             ))}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No drivers found.
                 </td>
               </tr>

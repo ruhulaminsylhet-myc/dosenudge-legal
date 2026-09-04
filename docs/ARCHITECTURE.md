@@ -90,7 +90,22 @@ MVP তে distance টা estimate (haversine × 1.3 road factor), duration ট
 ride এ finalFare + driver totals increment + ledger entry — সব একসাথে, কখনো
 আধা-হওয়া state থাকবে না।
 
-## 6. Admin panel
+## 6. Ratings ও driver documents
+
+**Rating:** trip complete হওয়ার পর rider app-এ star rating card আসে। কিন্তু rating
+সরাসরি Firestore-এ লেখা হয় **না** — rules-এ `drivers.rating` client-write বন্ধ।
+Rider `rateRide` callable ডাকে, সেটা একটা transaction-এ:
+1. check করে ride টা এই rider-এরই, `completed`, আর আগে rate করা হয়নি
+2. stored `rating × ratingCount` থেকে নতুন average বের করে (client যা পাঠাল
+   তা বিশ্বাস না করে) — দুইজন একসাথে rate করলেও value drift করবে না
+
+**Documents:** driver approval-এর আগে licence, insurance আর vehicle photo upload
+করতে হয় → Firebase Storage-এ `driver_docs/{uid}/` path-এ (storage rules: শুধু
+নিজে + admin পড়তে পারে, ১০ MB limit, image/PDF only)। URL গুলো driver doc-এর
+`documents` map-এ জমা হয়, আর admin panel-এর Drivers table-এ clickable link
+হিসেবে দেখায় — approve চাপার আগে admin যাচাই করে নিতে পারে।
+
+## 7. Admin panel
 
 Next.js client app — Firebase JS SDK দিয়ে সরাসরি Firestore পড়ে (admin claim
 rules এ check হয়), আর privileged action গুলোতে callable functions ডাকে
@@ -101,7 +116,7 @@ Pages: Dashboard (aggregate counts), Drivers (approve/reject + live online
 status), Users (search + suspend/reactivate), Rides (live `onSnapshot` feed),
 Pricing (config editor)।
 
-## 7. কেন এই decisions (trade-offs)
+## 8. কেন এই decisions (trade-offs)
 
 | Decision | কারণ |
 |---|---|

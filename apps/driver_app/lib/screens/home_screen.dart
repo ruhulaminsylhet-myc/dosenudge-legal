@@ -6,6 +6,7 @@ import '../services/driver_service.dart';
 import '../services/notification_service.dart';
 import '../services/ride_service.dart';
 import 'active_ride_screen.dart';
+import 'documents_screen.dart';
 import 'earnings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -69,6 +70,13 @@ class _HomeScreenState extends State<HomeScreen> {
           appBar: AppBar(
             title: Text(profile.name),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.folder_outlined),
+                tooltip: 'Documents',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DocumentsScreen()),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.payments_outlined),
                 tooltip: 'Earnings',
@@ -272,6 +280,31 @@ class _PendingScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600),
               ),
+              if (!rejected) ...[
+                const SizedBox(height: 24),
+                if (!profile.hasAllDocuments)
+                  Text(
+                    'Your documents are still incomplete — we can\'t review '
+                    'your application until they\'re uploaded.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(
+                    profile.hasAllDocuments
+                        ? 'Review documents'
+                        : 'Upload documents',
+                  ),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DocumentsScreen()),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

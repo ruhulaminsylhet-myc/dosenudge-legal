@@ -44,6 +44,7 @@ class Ride {
   final Fare? fareEstimate;
   final Fare? finalFare;
   final Timestamp? requestedAt;
+  final int? rating;
 
   const Ride({
     required this.id,
@@ -56,6 +57,7 @@ class Ride {
     required this.fareEstimate,
     required this.finalFare,
     required this.requestedAt,
+    required this.rating,
   });
 
   factory Ride.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -72,6 +74,7 @@ class Ride {
       fareEstimate: Fare.fromMap(d['fareEstimate'] as Map<String, dynamic>?),
       finalFare: Fare.fromMap(d['finalFare'] as Map<String, dynamic>?),
       requestedAt: d['requestedAt'] as Timestamp?,
+      rating: (d['rating'] as num?)?.toInt(),
     );
   }
 

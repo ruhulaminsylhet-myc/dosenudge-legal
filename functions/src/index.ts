@@ -303,6 +303,59 @@ export const getFareEstimate = onCall(async (request) => {
   };
 });
 
+// Rider rates a completed trip. Ratings are server-owned: rules block clients
+// from touching drivers.rating, so the running average is only ever written here.
+export const rateRide = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in first.");
+  const { rideId, rating } = request.data as { rideId: string; rating: number };
+  if (!rideId || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new HttpsError("invalid-argument", "rideId and a rating of 1-5 are required.");
+  }
+
+  const rideRef = db().doc(`rides/${rideId}`);
+  const uid = request.auth.uid;
+
+  const driverId = await db().runTransaction(async (tx) => {
+    const snap = await tx.get(rideRef);
+    const ride = snap.data() as RideDoc | undefined;
+    if (!ride) throw new HttpsError("not-found", "Ride not found.");
+    if (ride.riderId !== uid) {
+      throw new HttpsError("permission-denied", "You can only rate your own rides.");
+    }
+    if (ride.status !== "completed") {
+      throw new HttpsError("failed-precondition", "Only completed rides can be rated.");
+    }
+    if (ride.rating != null) {
+      throw new HttpsError("already-exists", "This ride has already been rated.");
+    }
+    if (!ride.driverId) {
+      throw new HttpsError("failed-precondition", "This ride has no driver to rate.");
+    }
+
+    const driverRef = db().doc(`drivers/${ride.driverId}`);
+    const driverSnap = await tx.get(driverRef);
+    const driver = driverSnap.data() as DriverDoc | undefined;
+    if (!driver) throw new HttpsError("not-found", "Driver not found.");
+
+    // Recompute the average from the stored total rather than trusting the
+    // client, so concurrent ratings can't drift the value.
+    const count = driver.ratingCount ?? 0;
+    const newCount = count + 1;
+    const newAverage = ((driver.rating ?? 0) * count + rating) / newCount;
+
+    tx.update(rideRef, { rating });
+    tx.update(driverRef, {
+      rating: Math.round(newAverage * 100) / 100,
+      ratingCount: newCount,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return ride.driverId;
+  });
+
+  logger.info("ride rated", { rideId, driverId, rating });
+  return { ok: true };
+});
+
 function requireAdmin(request: { auth?: { token?: Record<string, unknown> } | null }): void {
   if (request.auth?.token?.admin !== true) {
     throw new HttpsError("permission-denied", "Admin access required.");

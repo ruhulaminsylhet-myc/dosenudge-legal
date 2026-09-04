@@ -1,7 +1,10 @@
 import 'dart:async';
 
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../core/geohash.dart';
@@ -62,6 +65,21 @@ class DriverService {
       'isOnline': online,
       'location': GeoPoint(pos.latitude, pos.longitude),
       'geohash': Geohash.encode(pos.latitude, pos.longitude),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Uploads a verification document to `driver_docs/{uid}/` (storage rules
+  /// restrict reads to the driver themself and admins) and records its URL on
+  /// the driver profile so the admin panel can review it before approval.
+  Future<void> uploadDocument(DriverDocument doc, File file) async {
+    final ext = file.path.split('.').last.toLowerCase();
+    final ref = FirebaseStorage.instance
+        .ref('driver_docs/$_uid/${doc.key}.$ext');
+    await ref.putFile(file);
+    final url = await ref.getDownloadURL();
+    await _ref.update({
+      'documents.${doc.key}': url,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
