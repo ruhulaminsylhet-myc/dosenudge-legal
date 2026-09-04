@@ -7,13 +7,18 @@
 //
 // Usage:
 //   node scripts/setup-flutter-apps.mjs
-//   node scripts/setup-flutter-apps.mjs driver_app    # just one app
+//   node scripts/setup-flutter-apps.mjs driver_app          # just one app
+//   node scripts/setup-flutter-apps.mjs --org=com.yourco    # your bundle ids
+//
+// --org sets the bundle id prefix, producing com.yourco.taxi.driver and
+// com.yourco.taxi.rider. It only applies the first time, when the platform
+// folders are created. Defaults to com.example.
 //
 // Afterwards, run `flutterfire configure` inside each app to generate
 // lib/firebase_options.dart (it is gitignored — one per Firebase project).
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -109,6 +114,50 @@ function patchMinSdk(appDir) {
   console.warn("  ! skipped minSdk patch: no android/app/build.gradle[.kts]");
 }
 
+// `flutter create --org X` appends the pubspec project name, giving ids like
+// com.yourco.taxi.taxi_driver_app. Set the id we actually want instead.
+function patchBundleId(appDir, bundleId) {
+  for (const name of ["build.gradle.kts", "build.gradle"]) {
+    const file = join(appDir, "android/app", name);
+    if (!existsSync(file)) continue;
+    patch(file, (src) =>
+      src
+        .replace(/namespace\s*=\s*"[^"]+"/, `namespace = "${bundleId}"`)
+        .replace(/namespace\s+"[^"]+"/, `namespace "${bundleId}"`)
+        .replace(/applicationId\s*=\s*"[^"]+"/, `applicationId = "${bundleId}"`)
+        .replace(/applicationId\s+"[^"]+"/, `applicationId "${bundleId}"`)
+    );
+    break;
+  }
+
+  // Xcode keeps the id in three build configurations, plus the test target
+  // which must stay a child of the app's id.
+  const pbx = join(appDir, "ios/Runner.xcodeproj/project.pbxproj");
+  patch(pbx, (src) =>
+    src.replace(
+      /PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g,
+      (_, current) =>
+        `PRODUCT_BUNDLE_IDENTIFIER = ${bundleId}${
+          current.trim().endsWith(".RunnerTests") ? ".RunnerTests" : ""
+        };`
+    )
+  );
+}
+
+// `flutter create` drops in a widget test for the counter template app, which
+// references a MyApp class this project doesn't have — it fails `flutter
+// analyze` out of the box. Remove it, but only while it is still the untouched
+// template, so a real test written later is never deleted.
+function removeTemplateTest(appDir) {
+  const file = join(appDir, "test/widget_test.dart");
+  if (!existsSync(file)) return;
+  const src = readFileSync(file, "utf8");
+  if (src.includes("MyApp()") && src.includes("Counter increments smoke test")) {
+    rmSync(file);
+    console.log(`  ✔ removed template test: ${file}`);
+  }
+}
+
 function patchInfoPlist(appDir, config) {
   const file = join(appDir, "ios/Runner/Info.plist");
   patch(file, (plist) => {
@@ -129,7 +178,10 @@ function patchInfoPlist(appDir, config) {
   });
 }
 
-const requested = process.argv.slice(2);
+const args = process.argv.slice(2);
+const orgArg = args.find((a) => a.startsWith("--org="));
+const ORG = orgArg ? orgArg.slice("--org=".length) : "com.example";
+const requested = args.filter((a) => !a.startsWith("--"));
 const targets = requested.length > 0 ? requested : Object.keys(APPS);
 
 for (const app of targets) {
@@ -145,17 +197,25 @@ for (const app of targets) {
     process.exit(1);
   }
 
+  // driver_app -> com.yourco.taxi.driver, rider_app -> com.yourco.taxi.rider
+  const bundleSuffix = app.replace("_app", "");
   console.log(`\n== ${app} ==`);
   if (!existsSync(join(appDir, "android"))) {
-    console.log("  Generating platform folders…");
-    run("flutter", ["create", ".", "--platforms=android,ios"], appDir);
+    console.log(`  Generating platform folders (${ORG}.taxi.${bundleSuffix})…`);
+    run(
+      "flutter",
+      ["create", ".", "--platforms=android,ios", "--org", `${ORG}.taxi`],
+      appDir
+    );
   } else {
     console.log("  Platform folders already exist.");
   }
 
   patchAndroidManifest(appDir, config);
   patchMinSdk(appDir);
+  patchBundleId(appDir, `${ORG}.taxi.${bundleSuffix}`);
   patchInfoPlist(appDir, config);
+  removeTemplateTest(appDir);
 
   console.log("  Fetching packages…");
   run("flutter", ["pub", "get"], appDir);

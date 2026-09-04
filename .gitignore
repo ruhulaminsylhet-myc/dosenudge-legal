@@ -19,6 +19,7 @@ firestore-debug.log
 ui-debug.log
 
 # Flutter / Dart
+*.iml
 .dart_tool/
 .packages
 build/
