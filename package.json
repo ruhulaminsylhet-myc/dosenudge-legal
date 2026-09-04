@@ -1,0 +1,18 @@
+{
+  "name": "taxi-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Operator scripts for the taxi platform (admin bootstrap, pricing seed, emulator demo data).",
+  "type": "module",
+  "scripts": {
+    "set-admin": "node scripts/set-admin.mjs",
+    "seed-pricing": "node scripts/seed-pricing.mjs",
+    "seed-emulator": "node scripts/seed-emulator.mjs",
+    "setup-flutter": "node scripts/setup-flutter-apps.mjs",
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-taxi",
+    "test:rules": "cd tests && npm test"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

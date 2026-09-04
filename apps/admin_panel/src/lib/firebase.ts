@@ -1,7 +1,20 @@
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  type Firestore,
+} from "firebase/firestore";
+import {
+  connectFunctionsEmulator,
+  getFunctions,
+  httpsCallable,
+  type Functions,
+} from "firebase/functions";
+
+// Point the whole app at `firebase emulators:start` instead of a real project.
+// Lets you run and demo the panel with no Firebase project and no billing.
+const USE_EMULATOR = process.env.NEXT_PUBLIC_USE_EMULATOR === "true";
 
 // Lazy singletons: nothing initializes at module scope, so Next.js can
 // prerender pages without real Firebase env vars.
@@ -19,19 +32,40 @@ function app(): FirebaseApp {
   );
 }
 
+// connect*Emulator throws if called twice on the same instance, so each getter
+// wires its emulator exactly once.
+let authWired = false;
+let firestoreWired = false;
+let functionsWired = false;
+
 export function firebaseAuth(): Auth {
-  return getAuth(app());
+  const auth = getAuth(app());
+  if (USE_EMULATOR && !authWired) {
+    authWired = true;
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  }
+  return auth;
 }
 
 export function firestore(): Firestore {
-  return getFirestore(app());
+  const db = getFirestore(app());
+  if (USE_EMULATOR && !firestoreWired) {
+    firestoreWired = true;
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  }
+  return db;
 }
 
-function fns() {
-  return getFunctions(
+function fns(): Functions {
+  const functions = getFunctions(
     app(),
     process.env.NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION ?? "europe-west2"
   );
+  if (USE_EMULATOR && !functionsWired) {
+    functionsWired = true;
+    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+  }
+  return functions;
 }
 
 export function callSetDriverApproval(data: {

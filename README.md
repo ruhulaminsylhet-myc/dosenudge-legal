@@ -102,6 +102,24 @@ Give the two apps **different bundle ids** (e.g. `com.yourco.taxi.driver` and
 writes `lib/firebase_options.dart`, which is gitignored because it differs per
 environment.
 
+## Try it with no Firebase project (emulator demo)
+
+Run the whole admin panel against the local emulator — no project, no billing,
+no credentials:
+
+```bash
+npm install                      # once, for the operator scripts
+npm run emulators                # terminal 1: auth + firestore
+npm run seed-emulator            # terminal 2: demo admin, drivers, rides
+cd apps/admin_panel && npm install
+NEXT_PUBLIC_USE_EMULATOR=true npm run dev
+```
+
+Sign in at <http://localhost:3000> with **admin@demo.test / demo1234**. You get
+3 drivers (one pending approval with documents to review), 5 rides across every
+status, and GBP pricing — enough to click through the whole operator flow before
+touching a real project.
+
 ## Tests
 
 Security rules are the main thing standing between a driver and someone else's
