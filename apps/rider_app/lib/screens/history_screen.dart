@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../core/models.dart';
+import '../l10n/strings.dart';
 import '../services/rider_service.dart';
 import 'ride_screen.dart';
 
@@ -10,9 +11,10 @@ class HistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final dateFmt = DateFormat('d MMM yyyy, HH:mm');
     return Scaffold(
-      appBar: AppBar(title: const Text('Ride history')),
+      appBar: AppBar(title: Text(t.rideHistory)),
       body: StreamBuilder<List<Ride>>(
         stream: RiderService.instance.history(),
         builder: (context, snapshot) {
@@ -21,7 +23,7 @@ class HistoryScreen extends StatelessWidget {
           }
           final rides = snapshot.data!;
           if (rides.isEmpty) {
-            return const Center(child: Text('No rides yet.'));
+            return Center(child: Text(t.noRidesYet));
           }
           return ListView.separated(
             itemCount: rides.length,

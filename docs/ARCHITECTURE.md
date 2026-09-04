@@ -157,7 +157,28 @@ Rider (trip শেষে) → createRideCheckout → Stripe Checkout page
 Driver payout setup না করলে checkout fail করে আর rider-কে cash দিতে বলা হয় —
 MVP-তে এটাই intended behaviour।
 
-## 8. Admin panel
+## 8. Localisation (English + বাংলা)
+
+দুটো app-ই device-এর ভাষা অনুযায়ী **English বা বাংলা** দেখায় — আলাদা setting
+লাগে না, অন্য কোনো ভাষা হলে English-এ পড়ে যায়।
+
+সব string এক জায়গায়: `apps/<app>/lib/l10n/strings.dart`। প্রতিটা লাইনে ইংরেজি আর
+বাংলা পাশাপাশি —
+```dart
+String get bookATaxi => _('Book a taxi', 'ট্যাক্সি বুক করুন');
+```
+`.arb` file + codegen ব্যবহার করিনি: string সংখ্যা কম, build-এ codegen step
+লাগে না, আর দুই অনুবাদ পাশাপাশি থাকায় একটা বদলে অন্যটা বদলাতে ভুলে যাওয়ার
+সুযোগ নেই। Screen-এ ব্যবহার: `final t = Strings.of(context);` তারপর `t.bookATaxi`।
+
+নতুন ভাষা যোগ করতে: `supportedLocales`-এ locale যোগ করে `_()` কে map-based
+করে দিলেই হবে।
+
+**খেয়াল রাখার বিষয়:** `await`-এর পরে `Strings.of(context)` ডাকা যাবে না
+(BuildContext across async gap) — তাই সব async method-এ `final t` আগে ধরে
+রাখা হয়েছে; analyzer এটা ধরিয়ে দেয়।
+
+## 9. Admin panel
 
 Next.js client app — Firebase JS SDK দিয়ে সরাসরি Firestore পড়ে (admin claim
 rules এ check হয়), আর privileged action গুলোতে callable functions ডাকে
@@ -168,7 +189,7 @@ Pages: Dashboard (aggregate counts), Drivers (approve/reject + live online
 status), Users (search + suspend/reactivate), Rides (live `onSnapshot` feed),
 Pricing (config editor)।
 
-## 9. কেন এই decisions (trade-offs)
+## 10. কেন এই decisions (trade-offs)
 
 | Decision | কারণ |
 |---|---|

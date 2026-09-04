@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/models.dart';
+import '../l10n/strings.dart';
 import '../services/ride_service.dart';
 
 /// Panel shown on the home screen while a ride is in progress.
@@ -21,10 +22,19 @@ class ActiveRidePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final (label, nextStatus, action) = switch (ride.status) {
-      'accepted' => ('Heading to pickup', 'I have arrived', RideService.instance.markArrived),
-      'arrived' => ('Waiting for rider', 'Start trip', RideService.instance.startTrip),
-      'in_progress' => ('Trip in progress', 'Complete trip', RideService.instance.completeTrip),
+      'accepted' => (
+          t.headingToPickup,
+          t.iHaveArrived,
+          RideService.instance.markArrived
+        ),
+      'arrived' => (t.waitingForRider, t.startTrip, RideService.instance.startTrip),
+      'in_progress' => (
+          t.tripInProgress,
+          t.completeTrip,
+          RideService.instance.completeTrip
+        ),
       _ => ('', '', null),
     };
 
@@ -58,7 +68,7 @@ class ActiveRidePanel extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Rider: ${ride.riderName}'),
+                      Text(t.riderName(ride.riderName)),
                       if (fare != null)
                         Text(
                           '${fare.currency} ${fare.total.toStringAsFixed(2)}',
@@ -74,8 +84,8 @@ class ActiveRidePanel extends StatelessWidget {
           OutlinedButton.icon(
             icon: const Icon(Icons.navigation_outlined),
             label: Text(ride.status == 'in_progress'
-                ? 'Navigate to dropoff'
-                : 'Navigate to pickup'),
+                ? t.navigateToDropoff
+                : t.navigateToPickup),
             onPressed: () => _navigateTo(target),
           ),
           const SizedBox(height: 8),
@@ -91,17 +101,16 @@ class ActiveRidePanel extends StatelessWidget {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Cancel this ride?'),
-                    content: const Text(
-                        'Frequent cancellations affect your standing.'),
+                    title: Text(t.cancelRideQuestion),
+                    content: Text(t.cancelWarning),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Keep ride'),
+                        child: Text(t.keepRide),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Cancel ride'),
+                        child: Text(t.cancelRide),
                       ),
                     ],
                   ),
@@ -110,8 +119,8 @@ class ActiveRidePanel extends StatelessWidget {
                   await RideService.instance.cancelRide(ride.id);
                 }
               },
-              child: const Text('Cancel ride',
-                  style: TextStyle(color: Colors.red)),
+              child: Text(t.cancelRide,
+                  style: const TextStyle(color: Colors.red)),
             ),
           ],
         ],

@@ -35,15 +35,15 @@ class Vehicle {
 }
 
 /// Which verification documents a driver must upload before approval.
+/// Labels live in the l10n strings so they can be translated.
 enum DriverDocument {
-  licence('licence', 'Driving licence'),
-  insurance('insurance', 'Insurance certificate'),
-  vehiclePhoto('vehiclePhoto', 'Vehicle photo');
+  licence('licence'),
+  insurance('insurance'),
+  vehiclePhoto('vehiclePhoto');
 
-  const DriverDocument(this.key, this.label);
+  const DriverDocument(this.key);
 
   final String key;
-  final String label;
 }
 
 class DriverProfile {

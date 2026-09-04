@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/strings.dart';
 import '../../services/auth_service.dart';
 import 'register_screen.dart';
 
@@ -27,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final t = Strings.of(context);
     setState(() {
       _busy = true;
       _error = null;
@@ -38,11 +40,11 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } on FirebaseAuthException catch (e) {
       setState(() => _error = switch (e.code) {
-            'user-disabled' => 'Your account has been suspended. Contact support.',
-            _ => 'Invalid email or password.',
+            'user-disabled' => t.accountSuspended,
+            _ => t.invalidCredentials,
           });
     } catch (_) {
-      setState(() => _error = 'Sign-in failed. Check your connection.');
+      setState(() => _error = t.signInFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -50,6 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -64,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Icon(Icons.local_taxi, size: 64, color: Color(0xFF1D4ED8)),
                   const SizedBox(height: 12),
                   Text(
-                    'Driver Sign In',
+                    t.driverSignIn,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
@@ -72,23 +75,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t.email,
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        v != null && v.contains('@') ? null : 'Enter a valid email',
+                        v != null && v.contains('@') ? null : t.enterValidEmail,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _password,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t.password,
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (v) =>
-                        v != null && v.length >= 6 ? null : 'Min 6 characters',
+                        v != null && v.length >= 6 ? null : t.minChars,
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -97,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _busy ? null : _submit,
-                    child: Text(_busy ? 'Signing in…' : 'Sign in'),
+                    child: Text(_busy ? t.signingIn : t.signIn),
                   ),
                   TextButton(
                     onPressed: _busy
@@ -107,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 builder: (_) => const RegisterScreen(),
                               ),
                             ),
-                    child: const Text('New driver? Apply here'),
+                    child: Text(t.applyHere),
                   ),
                 ],
               ),

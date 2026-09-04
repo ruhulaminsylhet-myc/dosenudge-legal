@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../l10n/strings.dart';
 import '../services/auth_service.dart';
 import '../services/driver_service.dart';
 import '../services/notification_service.dart';
@@ -67,27 +68,28 @@ class _HomeScreenState extends State<HomeScreen> {
           return _PendingScreen(profile: profile);
         }
 
+        final t = Strings.of(context);
         return Scaffold(
           appBar: AppBar(
             title: Text(profile.name),
             actions: [
               IconButton(
                 icon: const Icon(Icons.folder_outlined),
-                tooltip: 'Documents',
+                tooltip: t.documents,
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const DocumentsScreen()),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.payments_outlined),
-                tooltip: 'Earnings',
+                tooltip: t.earnings,
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const EarningsScreen()),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.logout),
-                tooltip: 'Sign out',
+                tooltip: t.signOut,
                 onPressed: () async {
                   await DriverService.instance.goOffline();
                   await AuthService.instance.signOut();
@@ -111,9 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       return ActiveRidePanel(ride: active);
                     }
                     if (!profile.isOnline) {
-                      return const Center(
-                        child: Text('Go online to receive ride requests.'),
-                      );
+                      return Center(child: Text(t.goOnlineForRequests));
                     }
                     return const _OpenRequestsList();
                   },
@@ -140,6 +140,7 @@ class _OnlineBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final online = profile.isOnline;
     return Material(
       color: online ? Colors.green.shade50 : Colors.grey.shade100,
@@ -157,7 +158,7 @@ class _OnlineBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    online ? 'You are online' : 'You are offline',
+                    online ? t.youAreOnline : t.youAreOffline,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   Text(
@@ -183,12 +184,13 @@ class _OpenRequestsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     return StreamBuilder<List<Ride>>(
       stream: RideService.instance.openRequests(),
       builder: (context, snapshot) {
         final rides = snapshot.data ?? [];
         if (rides.isEmpty) {
-          return const Center(child: Text('Waiting for ride requests…'));
+          return Center(child: Text(t.waitingForRequests));
         }
         return ListView.builder(
           padding: const EdgeInsets.all(12),
@@ -220,9 +222,7 @@ class _OpenRequestsList extends StatelessWidget {
                   final ok = await RideService.instance.acceptRide(ride.id);
                   if (!ok && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Ride no longer available.'),
-                      ),
+                      SnackBar(content: Text(t.rideNoLongerAvailable)),
                     );
                   }
                 },
@@ -242,10 +242,11 @@ class _PendingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final rejected = profile.approvalStatus == 'rejected';
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Application status'),
+        title: Text(t.applicationStatus),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -266,18 +267,13 @@ class _PendingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                rejected
-                    ? 'Your application was not approved.'
-                    : 'Your application is under review.',
+                rejected ? t.notApproved : t.underReview,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                rejected
-                    ? 'Please contact support for more information.'
-                    : 'We\'ll notify you as soon as you\'re approved. '
-                        'This screen updates automatically.',
+                rejected ? t.contactSupport : t.willNotify,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600),
               ),
@@ -285,8 +281,7 @@ class _PendingScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 if (!profile.hasAllDocuments)
                   Text(
-                    'Your documents are still incomplete — we can\'t review '
-                    'your application until they\'re uploaded.',
+                    t.documentsIncomplete,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.orange.shade800,
@@ -296,11 +291,9 @@ class _PendingScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   icon: const Icon(Icons.upload_file),
-                  label: Text(
-                    profile.hasAllDocuments
-                        ? 'Review documents'
-                        : 'Upload documents',
-                  ),
+                  label: Text(profile.hasAllDocuments
+                      ? t.reviewDocuments
+                      : t.uploadDocuments),
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const DocumentsScreen()),
                   ),

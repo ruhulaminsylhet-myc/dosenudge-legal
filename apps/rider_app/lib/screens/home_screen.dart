@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../l10n/strings.dart';
 import '../services/rider_service.dart';
 import 'history_screen.dart';
 import 'ride_screen.dart';
@@ -34,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _useCurrentLocation() async {
+    final t = Strings.of(context);
     setState(() => _busy = true);
     try {
       final point = await RiderService.instance.currentLocationPoint();
@@ -42,18 +44,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _pickup.text = point.address;
         _error = null;
       });
-    } catch (e) {
-      setState(() => _error = e.toString());
+    } catch (_) {
+      setState(() => _error = t.somethingWentWrong);
     } finally {
       setState(() => _busy = false);
     }
   }
 
-  Future<(RidePoint, RidePoint)?> _resolvePoints() async {
+  Future<(RidePoint, RidePoint)?> _resolvePoints(Strings t) async {
     final pickupText = _pickup.text.trim();
     final dropoffText = _dropoff.text.trim();
     if (pickupText.isEmpty || dropoffText.isEmpty) {
-      setState(() => _error = 'Enter both pickup and dropoff.');
+      setState(() => _error = t.enterBothAddresses);
       return null;
     }
     final pickup = (_pickupPoint != null && _pickupPoint!.address == pickupText)
@@ -64,13 +66,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _getEstimate() async {
+    final t = Strings.of(context);
     setState(() {
       _busy = true;
       _error = null;
       _estimate = null;
     });
     try {
-      final points = await _resolvePoints();
+      final points = await _resolvePoints(t);
       if (points == null) return;
       final data = await RiderService.instance.fareEstimate(points.$1, points.$2);
       final fare = Map<String, dynamic>.from(data['fare'] as Map);
@@ -79,19 +82,20 @@ class _HomeScreenState extends State<HomeScreen> {
             total: (fare['total'] as num).toDouble(),
           ));
     } catch (e) {
-      setState(() => _error = 'Could not get estimate: $e');
+      setState(() => _error = t.couldNotEstimate);
     } finally {
       setState(() => _busy = false);
     }
   }
 
   Future<void> _requestRide() async {
+    final t = Strings.of(context);
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final points = await _resolvePoints();
+      final points = await _resolvePoints(t);
       if (points == null) return;
       final name = await RiderService.instance.displayName();
       final rideId = await RiderService.instance.requestRide(
@@ -105,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (e) {
-      setState(() => _error = 'Could not request ride: $e');
+      setState(() => _error = t.couldNotRequest);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -113,13 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Book a taxi'),
+        title: Text(t.bookATaxi),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
-            tooltip: 'Ride history',
+            tooltip: t.rideHistory,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const HistoryScreen()),
             ),
@@ -143,8 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.green.shade50,
                   child: ListTile(
                     leading: const Icon(Icons.local_taxi, color: Colors.green),
-                    title: const Text('You have a ride in progress'),
-                    subtitle: Text('Status: ${ride.status.replaceAll('_', ' ')}'),
+                    title: Text(t.rideInProgress),
+                    subtitle: Text(ride.status.replaceAll('_', ' ')),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
@@ -163,12 +168,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextField(
                       controller: _pickup,
                       decoration: InputDecoration(
-                        labelText: 'Pickup address',
+                        labelText: t.pickupAddress,
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.trip_origin),
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.my_location),
-                          tooltip: 'Use current location',
+                          tooltip: t.useCurrentLocation,
                           onPressed: _busy ? null : _useCurrentLocation,
                         ),
                       ),
@@ -177,10 +182,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _dropoff,
-                      decoration: const InputDecoration(
-                        labelText: 'Dropoff address',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.place),
+                      decoration: InputDecoration(
+                        labelText: t.dropoffAddress,
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.place),
                       ),
                       onChanged: (_) => setState(() => _estimate = null),
                     ),
@@ -196,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Estimated fare'),
+                              Text(t.estimatedFare),
                               Text(
                                 _estimate!.label,
                                 style: const TextStyle(
@@ -210,12 +215,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 20),
                     OutlinedButton(
                       onPressed: _busy ? null : _getEstimate,
-                      child: const Text('Get fare estimate'),
+                      child: Text(t.getFareEstimate),
                     ),
                     const SizedBox(height: 8),
                     FilledButton(
                       onPressed: _busy ? null : _requestRide,
-                      child: Text(_busy ? 'Please wait…' : 'Request taxi'),
+                      child: Text(_busy ? t.pleaseWait : t.requestTaxi),
                     ),
                   ],
                 ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/models.dart';
+import '../l10n/strings.dart';
 import '../services/driver_service.dart';
 
 /// Upload the documents an admin needs before approving the driver.
@@ -14,12 +15,19 @@ class DocumentsScreen extends StatefulWidget {
   State<DocumentsScreen> createState() => _DocumentsScreenState();
 }
 
+String _documentLabel(Strings t, DriverDocument doc) => switch (doc) {
+      DriverDocument.licence => t.drivingLicence,
+      DriverDocument.insurance => t.insuranceCertificate,
+      DriverDocument.vehiclePhoto => t.vehiclePhoto,
+    };
+
 class _DocumentsScreenState extends State<DocumentsScreen> {
   final _picker = ImagePicker();
   DriverDocument? _uploading;
   String? _error;
 
   Future<void> _pickAndUpload(DriverDocument doc) async {
+    final t = Strings.of(context);
     setState(() {
       _uploading = doc;
       _error = null;
@@ -33,7 +41,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       if (picked == null) return;
       await DriverService.instance.uploadDocument(doc, File(picked.path));
     } catch (e) {
-      setState(() => _error = 'Upload failed. Check your connection and try again.');
+      setState(() => _error = t.uploadFailed);
     } finally {
       if (mounted) setState(() => _uploading = null);
     }
@@ -41,8 +49,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Verification documents')),
+      appBar: AppBar(title: Text(t.verificationDocuments)),
       body: StreamBuilder<DriverProfile>(
         stream: DriverService.instance.profileStream(),
         builder: (context, snapshot) {
@@ -54,8 +63,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               Text(
-                'Upload a clear photo of each document. Our team reviews them '
-                'before approving your account.',
+                t.documentsIntro,
                 style: TextStyle(color: Colors.grey.shade600),
               ),
               if (_error != null) ...[
@@ -74,11 +82,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                           ? Colors.green
                           : Colors.grey,
                     ),
-                    title: Text(doc.label),
+                    title: Text(_documentLabel(t, doc)),
                     subtitle: Text(
                       profile.documents.containsKey(doc.key)
-                          ? 'Uploaded'
-                          : 'Not uploaded yet',
+                          ? t.uploaded
+                          : t.notUploaded,
                     ),
                     trailing: _uploading == doc
                         ? const SizedBox(
@@ -92,28 +100,23 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                                 : () => _pickAndUpload(doc),
                             child: Text(
                               profile.documents.containsKey(doc.key)
-                                  ? 'Replace'
-                                  : 'Upload',
+                                  ? t.replace
+                                  : t.upload,
                             ),
                           ),
                   ),
                 ),
               const SizedBox(height: 16),
               if (profile.hasAllDocuments)
-                const Card(
-                  color: Color(0xFFE8F5E9),
+                Card(
+                  color: const Color(0xFFE8F5E9),
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.verified, color: Colors.green),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'All documents uploaded. Your application is ready '
-                            'for review.',
-                          ),
-                        ),
+                        const Icon(Icons.verified, color: Colors.green),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text(t.allDocumentsUploaded)),
                       ],
                     ),
                   ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/models.dart';
+import '../l10n/strings.dart';
 import '../services/rider_service.dart';
 
 class RideScreen extends StatelessWidget {
@@ -11,8 +12,9 @@ class RideScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Your ride')),
+      appBar: AppBar(title: Text(t.yourRide)),
       body: StreamBuilder<Ride>(
         stream: RiderService.instance.rideStream(rideId),
         builder: (context, snapshot) {
@@ -50,11 +52,11 @@ class RideScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(ride.finalFare != null
-                                ? 'Final fare'
-                                : 'Estimated fare'),
+                                ? t.finalFare
+                                : t.estimatedFare),
                             Text(
                               (ride.finalFare ?? ride.fareEstimate)?.label ??
-                                  'Calculating…',
+                                  t.calculating,
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold),
                             ),
@@ -92,12 +94,12 @@ class RideScreen extends StatelessWidget {
                       await RiderService.instance.cancelRide(ride.id);
                       if (context.mounted) Navigator.of(context).pop();
                     },
-                    child: const Text('Cancel ride'),
+                    child: Text(t.cancelRide),
                   ),
                 if (!ride.isOpen)
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Done'),
+                    child: Text(t.done),
                   ),
               ],
             ),
@@ -125,6 +127,7 @@ class _PaymentCardState extends State<_PaymentCard> {
   String? _error;
 
   Future<void> _pay() async {
+    final t = Strings.of(context);
     setState(() {
       _busy = true;
       _error = null;
@@ -135,7 +138,7 @@ class _PaymentCardState extends State<_PaymentCard> {
     } catch (e) {
       // The commonest case is a driver who hasn't finished payout setup, and
       // the callable explains that in its message.
-      setState(() => _error = 'Card payment unavailable — please pay in cash.');
+      setState(() => _error = t.cardUnavailable);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -143,6 +146,7 @@ class _PaymentCardState extends State<_PaymentCard> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final payment = widget.ride.payment;
     if (payment?.isPaid ?? false) {
       return Card(
@@ -153,8 +157,8 @@ class _PaymentCardState extends State<_PaymentCard> {
             children: [
               const Icon(Icons.verified, color: Colors.green),
               const SizedBox(width: 8),
-              Text('Paid — ${payment!.currency} '
-                  '${payment.amount.toStringAsFixed(2)}'),
+              Text(t.paidAmount(
+                  '${payment!.currency} ${payment.amount.toStringAsFixed(2)}')),
             ],
           ),
         ),
@@ -169,13 +173,10 @@ class _PaymentCardState extends State<_PaymentCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Pay your fare',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(t.payYourFare, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              payment?.status == 'failed'
-                  ? 'That payment did not go through. Try again or pay in cash.'
-                  : 'Pay securely by card, or settle in cash with your driver.',
+              payment?.status == 'failed' ? t.paymentFailed : t.payByCardOrCash,
               style: TextStyle(color: Colors.grey.shade600),
             ),
             if (_error != null) ...[
@@ -187,9 +188,7 @@ class _PaymentCardState extends State<_PaymentCard> {
               width: double.infinity,
               child: FilledButton.icon(
                 icon: const Icon(Icons.credit_card),
-                label: Text(_busy
-                    ? 'Opening…'
-                    : 'Pay ${fare?.label ?? ''} by card'),
+                label: Text(_busy ? t.opening : t.payByCard(fare?.label ?? '')),
                 onPressed: _busy ? null : _pay,
               ),
             ),
@@ -215,6 +214,7 @@ class _RatingCardState extends State<_RatingCard> {
   String? _error;
 
   Future<void> _submit() async {
+    final t = Strings.of(context);
     setState(() {
       _busy = true;
       _error = null;
@@ -224,7 +224,7 @@ class _RatingCardState extends State<_RatingCard> {
       // The ride stream pushes the saved rating back, flipping this card to
       // its thank-you state.
     } catch (e) {
-      setState(() => _error = 'Could not save your rating. Please try again.');
+      setState(() => _error = t.ratingFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -232,6 +232,7 @@ class _RatingCardState extends State<_RatingCard> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final existing = widget.ride.rating;
     if (existing != null) {
       return Card(
@@ -242,7 +243,7 @@ class _RatingCardState extends State<_RatingCard> {
             children: [
               const Icon(Icons.check_circle, color: Colors.green),
               const SizedBox(width: 8),
-              Text('You rated this trip $existing ⭐'),
+              Text(t.ratedTrip(existing)),
             ],
           ),
         ),
@@ -256,7 +257,7 @@ class _RatingCardState extends State<_RatingCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Rate your driver',
+            Text(t.rateYourDriver,
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             Row(
@@ -279,7 +280,7 @@ class _RatingCardState extends State<_RatingCard> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: (_selected == 0 || _busy) ? null : _submit,
-                child: Text(_busy ? 'Saving…' : 'Submit rating'),
+                child: Text(_busy ? t.saving : t.submitRating),
               ),
             ),
           ],
@@ -296,14 +297,15 @@ class _StatusHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final (icon, color, text) = switch (status) {
-      'requested' => (Icons.search, Colors.amber, 'Finding you a driver…'),
-      'accepted' => (Icons.directions_car, Colors.blue, 'Driver is on the way'),
-      'arrived' => (Icons.hail, Colors.blue, 'Your driver has arrived'),
-      'in_progress' => (Icons.route, Colors.green, 'Trip in progress'),
-      'completed' => (Icons.check_circle, Colors.green, 'Trip completed'),
-      'cancelled' => (Icons.cancel, Colors.red, 'Ride cancelled'),
-      'expired' => (Icons.timer_off, Colors.grey, 'No drivers found'),
+      'requested' => (Icons.search, Colors.amber, t.findingDriver),
+      'accepted' => (Icons.directions_car, Colors.blue, t.driverOnWay),
+      'arrived' => (Icons.hail, Colors.blue, t.driverArrived),
+      'in_progress' => (Icons.route, Colors.green, t.tripInProgress),
+      'completed' => (Icons.check_circle, Colors.green, t.tripCompleted),
+      'cancelled' => (Icons.cancel, Colors.red, t.rideCancelled),
+      'expired' => (Icons.timer_off, Colors.grey, t.noDriversFound),
       _ => (Icons.info, Colors.grey, status),
     };
     return Row(

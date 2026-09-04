@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/models.dart';
+import '../l10n/strings.dart';
 import '../services/driver_service.dart';
 import '../services/ride_service.dart';
 
@@ -12,7 +13,7 @@ class EarningsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Earnings')),
+      appBar: AppBar(title: Text(Strings.of(context).earnings)),
       body: Column(
         children: [
           StreamBuilder<DriverProfile>(
@@ -46,6 +47,7 @@ class _PayoutSetupBannerState extends State<_PayoutSetupBanner> {
   String? _error;
 
   Future<void> _startOnboarding() async {
+    final t = Strings.of(context);
     setState(() {
       _busy = true;
       _error = null;
@@ -56,7 +58,7 @@ class _PayoutSetupBannerState extends State<_PayoutSetupBanner> {
       // Onboarding continues in the browser; check the outcome on return.
       await DriverService.instance.refreshPayoutStatus();
     } catch (_) {
-      setState(() => _error = 'Could not open payout setup. Please try again.');
+      setState(() => _error = t.payoutOpenFailed);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -64,6 +66,7 @@ class _PayoutSetupBannerState extends State<_PayoutSetupBanner> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     return Card(
       margin: const EdgeInsets.all(16),
       color: Colors.amber.shade50,
@@ -76,15 +79,12 @@ class _PayoutSetupBannerState extends State<_PayoutSetupBanner> {
               children: [
                 const Icon(Icons.account_balance, color: Colors.orange),
                 const SizedBox(width: 8),
-                Text('Set up payouts',
+                Text(t.setUpPayouts,
                     style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Add your bank details with Stripe so card fares reach you '
-              'automatically. Until then riders have to pay you in cash.',
-            ),
+            Text(t.payoutIntro),
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(_error!, style: const TextStyle(color: Colors.red)),
@@ -94,7 +94,7 @@ class _PayoutSetupBannerState extends State<_PayoutSetupBanner> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: _busy ? null : _startOnboarding,
-                child: Text(_busy ? 'Opening…' : 'Set up payouts'),
+                child: Text(_busy ? t.opening : t.setUpPayouts),
               ),
             ),
           ],
@@ -109,6 +109,7 @@ class _EarningsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     final dateFmt = DateFormat('d MMM, HH:mm');
 
     return StreamBuilder<List<EarningsEntry>>(
@@ -119,7 +120,7 @@ class _EarningsList extends StatelessWidget {
         }
         final entries = snapshot.data!;
         if (entries.isEmpty) {
-          return const Center(child: Text('No completed trips yet.'));
+          return Center(child: Text(t.noCompletedTrips));
         }
 
         final currency = entries.first.currency;
@@ -138,8 +139,8 @@ class _EarningsList extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Net earnings (last 50 trips)',
-                      style: TextStyle(color: Colors.white70)),
+                  Text(t.netEarnings,
+                      style: const TextStyle(color: Colors.white70)),
                   Text(
                     '$currency ${total.toStringAsFixed(2)}',
                     style: const TextStyle(
@@ -164,10 +165,10 @@ class _EarningsList extends StatelessWidget {
                       '${e.currency} ${e.netPayout.toStringAsFixed(2)}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: Text(
-                      'Fare ${e.grossFare.toStringAsFixed(2)} · '
-                      'commission ${e.commission.toStringAsFixed(2)}',
-                    ),
+                    subtitle: Text(t.fareAndCommission(
+                      e.grossFare.toStringAsFixed(2),
+                      e.commission.toStringAsFixed(2),
+                    )),
                     trailing: Text(
                       e.createdAt != null
                           ? dateFmt.format(e.createdAt!.toDate())

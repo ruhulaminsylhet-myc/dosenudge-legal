@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../l10n/strings.dart';
 import '../services/rider_service.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -30,6 +31,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final t = Strings.of(context);
     setState(() {
       _busy = true;
       _error = null;
@@ -50,13 +52,13 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = switch (e.code) {
-            'user-disabled' => 'Your account has been suspended.',
-            'email-already-in-use' => 'This email is already registered.',
-            'weak-password' => 'Password is too weak.',
-            _ => 'Sign-in failed. Check your details.',
+            'user-disabled' => t.accountSuspended,
+            'email-already-in-use' => t.emailInUse,
+            'weak-password' => t.weakPassword,
+            _ => t.signInFailed,
           });
     } catch (_) {
-      setState(() => _error = 'Something went wrong. Try again.');
+      setState(() => _error = t.somethingWentWrong);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -64,6 +66,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Strings.of(context);
     InputDecoration deco(String label) => InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -83,7 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   const Icon(Icons.local_taxi, size: 64, color: Color(0xFF059669)),
                   const SizedBox(height: 12),
                   Text(
-                    _registerMode ? 'Create account' : 'Welcome back',
+                    _registerMode ? t.createAccount : t.welcomeBack,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
@@ -91,35 +94,35 @@ class _AuthScreenState extends State<AuthScreen> {
                   if (_registerMode) ...[
                     TextFormField(
                       controller: _name,
-                      decoration: deco('Full name'),
+                      decoration: deco(t.fullName),
                       validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
+                          v == null || v.trim().isEmpty ? t.required : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _phone,
                       keyboardType: TextInputType.phone,
-                      decoration: deco('Phone number'),
+                      decoration: deco(t.phoneNumber),
                       validator: (v) =>
-                          v == null || v.trim().isEmpty ? 'Required' : null,
+                          v == null || v.trim().isEmpty ? t.required : null,
                     ),
                     const SizedBox(height: 12),
                   ],
                   TextFormField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: deco('Email'),
+                    decoration: deco(t.email),
                     validator: (v) =>
-                        v != null && v.contains('@') ? null : 'Enter a valid email',
+                        v != null && v.contains('@') ? null : t.enterValidEmail,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _password,
                     obscureText: true,
-                    decoration: deco('Password'),
+                    decoration: deco(t.password),
                     validator: (v) => v != null && v.length >= (_registerMode ? 8 : 6)
                         ? null
-                        : 'Too short',
+                        : t.tooShort,
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -129,8 +132,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   FilledButton(
                     onPressed: _busy ? null : _submit,
                     child: Text(_busy
-                        ? 'Please wait…'
-                        : (_registerMode ? 'Create account' : 'Sign in')),
+                        ? t.pleaseWait
+                        : (_registerMode ? t.createAccount : t.signIn)),
                   ),
                   TextButton(
                     onPressed: _busy
@@ -139,9 +142,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               _registerMode = !_registerMode;
                               _error = null;
                             }),
-                    child: Text(_registerMode
-                        ? 'Already have an account? Sign in'
-                        : 'New here? Create an account'),
+                    child: Text(_registerMode ? t.haveAccount : t.newHere),
                   ),
                 ],
               ),

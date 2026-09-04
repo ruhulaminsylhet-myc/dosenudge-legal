@@ -35,6 +35,8 @@ A complete three-tier ride-hailing MVP:
   account, so there is no payout run to manage. Cash still works: if a driver
   hasn't finished payout setup, the rider is told to settle in cash.
 
+Both apps ship in **English and Bangla**, following the device language.
+
 Security: role-based access via Firebase custom claims (`role`, `admin`) +
 Firestore rules. Clients can never grant themselves a role, change approval
 status, or write earnings. See `docs/ARCHITECTURE.md`.
@@ -181,4 +183,4 @@ enabling their own Stripe payouts. CI runs it on every push.
 2. In-app live map (`google_maps_flutter`) + driver ETA.
 3. Driver-rates-rider (rider-rates-driver already ships) and automated
    document expiry reminders.
-4. Bangla localisation (`intl` is already wired) and bKash for a BD launch.
+4. bKash / Nagad for a Bangladesh launch (Stripe covers UK cards today).
