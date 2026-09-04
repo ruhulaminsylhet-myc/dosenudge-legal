@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../core/models.dart';
 
@@ -55,15 +58,97 @@ class RideService {
   Future<void> markArrived(String rideId) =>
       _db.doc('rides/$rideId').update({'status': 'arrived'});
 
-  Future<void> startTrip(String rideId) =>
-      _db.doc('rides/$rideId').update({'status': 'in_progress'});
+  Future<void> startTrip(String rideId) async {
+    await _db.doc('rides/$rideId').update({'status': 'in_progress'});
+    _startMetering(rideId);
+  }
 
-  Future<void> completeTrip(String rideId) =>
-      _db.doc('rides/$rideId').update({'status': 'completed'});
+  Future<void> completeTrip(String rideId) async {
+    await _flushMeter(rideId);
+    _stopMetering();
+    await _db.doc('rides/$rideId').update({'status': 'completed'});
+  }
 
-  Future<void> cancelRide(String rideId) => _db
-      .doc('rides/$rideId')
-      .update({'status': 'cancelled', 'cancelledBy': 'driver'});
+  // ---------- trip meter ----------
+  //
+  // The fare is billed on the distance actually driven, so the trip is measured
+  // here rather than assumed from the straight line. Writes are batched every
+  // [_meterWriteThresholdKm] to keep Firestore writes down on a long trip; the
+  // server clamps the total before charging anyone, so a bad reading can't
+  // inflate a fare.
+
+  static const _meterWriteThresholdKm = 0.2;
+
+  StreamSubscription<Position>? _meterSub;
+  Position? _lastMeterFix;
+  double _meteredKm = 0;
+  double _unwrittenKm = 0;
+
+  void _startMetering(String rideId) {
+    _stopMetering();
+    _meteredKm = 0;
+    _unwrittenKm = 0;
+    _lastMeterFix = null;
+    _meterSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 20,
+      ),
+    ).listen((pos) {
+      final previous = _lastMeterFix;
+      _lastMeterFix = pos;
+      if (previous == null) return;
+
+      // Drop jittery fixes: a poor GPS lock can otherwise add phantom metres
+      // while the car is stationary.
+      if (pos.accuracy > 50) return;
+
+      final metres = Geolocator.distanceBetween(
+        previous.latitude,
+        previous.longitude,
+        pos.latitude,
+        pos.longitude,
+      );
+      if (metres < 5) return;
+
+      final km = metres / 1000;
+      _meteredKm += km;
+      _unwrittenKm += km;
+      if (_unwrittenKm >= _meterWriteThresholdKm) {
+        _unwrittenKm = 0;
+        _writeMeter(rideId);
+      }
+    });
+  }
+
+  Future<void> _flushMeter(String rideId) async {
+    if (_meteredKm > 0) await _writeMeter(rideId);
+  }
+
+  Future<void> _writeMeter(String rideId) async {
+    try {
+      await _db.doc('rides/$rideId').update({
+        'meteredDistanceKm': double.parse(_meteredKm.toStringAsFixed(3)),
+      });
+    } catch (_) {
+      // A dropped write just means the next one carries the total; the value
+      // is cumulative rather than incremental for exactly this reason.
+    }
+  }
+
+  void _stopMetering() {
+    _meterSub?.cancel();
+    _meterSub = null;
+  }
+
+  void dispose() => _stopMetering();
+
+  Future<void> cancelRide(String rideId) {
+    _stopMetering();
+    return _db
+        .doc('rides/$rideId')
+        .update({'status': 'cancelled', 'cancelledBy': 'driver'});
+  }
 
   Stream<List<EarningsEntry>> earnings({int limit = 50}) => _db
       .collection('earnings')

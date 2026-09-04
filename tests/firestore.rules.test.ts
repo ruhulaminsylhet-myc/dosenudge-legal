@@ -241,6 +241,60 @@ describe("ride status machine", () => {
     );
   });
 
+  test("the driver's app can report the trip getting longer", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "rides", "openRide"), {
+        status: "in_progress",
+        meteredDistanceKm: 2,
+      });
+    });
+    await assertSucceeds(
+      updateDoc(doc(driver(NEAR_DRIVER), "rides", "openRide"), {
+        meteredDistanceKm: 2.4,
+      })
+    );
+  });
+
+  test("the driver cannot wind the metered distance back down", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "rides", "openRide"), {
+        status: "in_progress",
+        meteredDistanceKm: 5,
+      });
+    });
+    await assertFails(
+      updateDoc(doc(driver(NEAR_DRIVER), "rides", "openRide"), {
+        meteredDistanceKm: 1,
+      })
+    );
+  });
+
+  test("a driver cannot meter someone else's trip", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "rides", "openRide"), {
+        status: "in_progress",
+      });
+    });
+    await assertFails(
+      updateDoc(doc(driver(FAR_DRIVER), "rides", "openRide"), {
+        meteredDistanceKm: 99,
+      })
+    );
+  });
+
+  test("metering is rejected once the trip is over", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), "rides", "openRide"), {
+        status: "completed",
+      });
+    });
+    await assertFails(
+      updateDoc(doc(driver(NEAR_DRIVER), "rides", "openRide"), {
+        meteredDistanceKm: 99,
+      })
+    );
+  });
+
   test("the driver cannot rewrite the fare while advancing status", async () => {
     await assertFails(
       updateDoc(doc(driver(NEAR_DRIVER), "rides", "openRide"), {

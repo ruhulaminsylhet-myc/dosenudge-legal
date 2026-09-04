@@ -89,8 +89,19 @@ export default function RidesPage() {
                       → {r.dropoff?.address}
                     </p>
                   </td>
-                  <td className="px-4 py-3">
-                    {r.estimatedDistanceKm ? `${r.estimatedDistanceKm} km` : "—"}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {r.billedDistanceKm ? (
+                      <>
+                        {r.billedDistanceKm} km
+                        <span className="ml-1 text-xs text-slate-400">
+                          metered
+                        </span>
+                      </>
+                    ) : r.estimatedDistanceKm ? (
+                      `${r.estimatedDistanceKm} km`
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {fare ? `${fare.currency} ${fare.total.toFixed(2)}` : "—"}

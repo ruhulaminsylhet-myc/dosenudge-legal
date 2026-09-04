@@ -93,6 +93,8 @@ export interface RideDoc {
   dropoff: RidePoint;
   estimatedDistanceKm: number;
   estimatedDurationMin: number;
+  /** Distance the driver's app actually measured during the trip, in km. */
+  meteredDistanceKm?: number;
   fareEstimate: Fare | null;
   finalFare: Fare | null;
   offeredTo: string[];
@@ -123,6 +125,13 @@ export interface PricingConfig {
   searchRadiusKm: number;
   maxDriversNotified: number;
   requestTimeoutSec: number;
+  /**
+   * Ceiling on billable distance as a multiple of the straight-line pickup →
+   * dropoff distance. The driver's app reports the metered distance, so this
+   * caps what an inflated reading can charge a rider. 2.5 comfortably covers
+   * one-way systems and diversions.
+   */
+  maxRouteFactor: number;
 }
 
 export const DEFAULT_PRICING: PricingConfig = {
@@ -135,4 +144,5 @@ export const DEFAULT_PRICING: PricingConfig = {
   searchRadiusKm: 8,
   maxDriversNotified: 10,
   requestTimeoutSec: 120,
+  maxRouteFactor: 2.5,
 };

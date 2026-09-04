@@ -93,10 +93,23 @@ commission = total × commissionPct%          → platform এর আয়
 driverPayout = total − commission            → earnings ledger এ জমা হয়
 ```
 
-MVP তে distance টা estimate (haversine × 1.3 road factor), duration টা আসল
-(trip start → complete)। Settlement একটা Firestore **transaction** এ হয়:
-ride এ finalFare + driver totals increment + ledger entry — সব একসাথে, কখনো
-আধা-হওয়া state থাকবে না।
+**Distance কোথা থেকে আসে:** ride request-এর সময় দেখানো estimate টা haversine ×
+1.3 (শুধু rider-কে আগে থেকে ধারণা দেওয়ার জন্য)। কিন্তু **আসল বিল হয় driver-এর
+app যে দূরত্ব মেপেছে সেটায়** — trip `in_progress` থাকাকালীন GPS fix গুলোর মধ্যে
+দূরত্ব যোগ হতে থাকে (প্রতি 200 m-এ একবার Firestore-এ লেখা হয়, cumulative value,
+তাই একটা write miss হলেও পরেরটায় ঠিক হয়ে যায়)।
+
+Reading টা driver-এর device থেকে আসে, তাই settlement-এ **clamp** করা হয়:
+```
+billableKm = clamp(meteredKm, straightLineKm, straightLineKm × maxRouteFactor)
+```
+`maxRouteFactor` default 2.5 (admin panel-এ বদলানো যায়) — one-way system বা
+diversion-এর জন্য যথেষ্ট, কিন্তু কেউ মিটার ফুলিয়ে rider-কে ঠকাতে পারবে না।
+Rules-এও metered value শুধু **বাড়ানো** যায়, শুধু নিজের চলমান trip-এ (test করা)।
+
+Duration আসল (trip start → complete)। Settlement একটা Firestore
+**transaction** এ হয়: ride এ finalFare + billedDistanceKm + driver totals
+increment + ledger entry — সব একসাথে, কখনো আধা-হওয়া state থাকবে না।
 
 ## 6. Ratings ও driver documents
 

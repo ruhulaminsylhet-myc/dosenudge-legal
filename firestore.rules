@@ -109,6 +109,15 @@ service cloud.firestore {
             && resource.data.driverId == null
             && request.resource.data.driverId == request.auth.uid
             && request.resource.data.status == 'accepted')
+        // Assigned driver's app reports how far the trip has actually gone.
+        // Only ever upwards, only mid-trip, and settlement still clamps the
+        // value against the straight-line distance before charging anyone.
+        || (signedIn()
+            && changes(['meteredDistanceKm'])
+            && resource.data.driverId == request.auth.uid
+            && resource.data.status == 'in_progress'
+            && request.resource.data.meteredDistanceKm is number
+            && request.resource.data.meteredDistanceKm >= resource.data.get('meteredDistanceKm', 0))
         // Assigned driver advances the trip.
         || (signedIn()
             && changes(['status', 'cancelledBy'])

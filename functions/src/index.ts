@@ -15,7 +15,13 @@ import {
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as geofire from "geofire-common";
 
-import { computeFare, estimateTrip, getPricing } from "./pricing.js";
+import {
+  computeFare,
+  estimateTrip,
+  getPricing,
+  haversineKm,
+  round2,
+} from "./pricing.js";
 import { sendPush, sendPushMulti } from "./notify.js";
 import type {
   ApprovalStatus,
@@ -237,13 +243,24 @@ async function settleRide(
   if (!ride.driverId) return;
   const pricing = await getPricing();
 
-  // MVP settlement uses the estimated trip; upgrade path is metering actual
-  // GPS distance from driver location pings.
   const startedAt = ride.startedAt?.toDate();
   const durationMin = startedAt
     ? Math.max(1, Math.round((Date.now() - startedAt.getTime()) / 60000))
     : ride.estimatedDurationMin;
-  const finalFare = computeFare(ride.estimatedDistanceKm, durationMin, pricing);
+
+  // Bill the distance the driver's app actually measured, so a longer real
+  // route pays the driver properly and a shorter one doesn't overcharge the
+  // rider. The reading comes from the driver's device, so it is clamped: never
+  // below the straight-line distance, never above maxRouteFactor times it.
+  const straightLineKm = haversineKm(ride.pickup, ride.dropoff);
+  const billableKm = ride.meteredDistanceKm
+    ? Math.min(
+        Math.max(ride.meteredDistanceKm, straightLineKm),
+        straightLineKm * pricing.maxRouteFactor
+      )
+    : ride.estimatedDistanceKm;
+
+  const finalFare = computeFare(round2(billableKm), durationMin, pricing);
 
   const driverRef = db().doc(`drivers/${ride.driverId}`);
   const earningsRef = db().collection("earnings").doc();
@@ -251,6 +268,7 @@ async function settleRide(
   await db().runTransaction(async (tx) => {
     tx.update(ref, {
       finalFare,
+      billedDistanceKm: round2(billableKm),
       completedAt: FieldValue.serverTimestamp(),
     });
     tx.update(driverRef, {

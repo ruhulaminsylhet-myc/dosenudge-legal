@@ -7,7 +7,7 @@ export async function getPricing(): Promise<PricingConfig> {
   return { ...DEFAULT_PRICING, ...(snap.data() as Partial<PricingConfig>) };
 }
 
-const round2 = (n: number): number => Math.round(n * 100) / 100;
+export const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 export function computeFare(
   distanceKm: number,

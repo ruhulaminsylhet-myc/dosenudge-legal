@@ -20,6 +20,7 @@ A complete three-tier ride-hailing MVP:
   (licence, insurance, vehicle photo), wait for admin approval, go online
   (live GPS + geohash), receive nearby ride offers via push, accept atomically,
   drive the trip through `accepted → arrived → in_progress → completed`, and see earnings.
+  The trip is metered by GPS, so the fare reflects the route actually driven.
 - **Admin (you)** reviews driver documents before approving/rejecting,
   suspends/reactivates any user (kills their session everywhere), watches live
   rides, and edits pricing, commission %, and dispatch settings — all changes
@@ -150,7 +151,7 @@ touching a real project.
 ## Tests
 
 Security rules are the main thing standing between a driver and someone else's
-data, so they have their own suite (35 assertions) that runs against the
+data, so they have their own suite (39 assertions) that runs against the
 Firestore emulator — no project or credentials needed:
 
 ```bash
@@ -178,7 +179,6 @@ enabling their own Stripe payouts. CI runs it on every push.
 1. Saved cards + automatic charge on trip end (today the rider taps to pay on
    Stripe Checkout).
 2. In-app live map (`google_maps_flutter`) + driver ETA.
-3. Actual GPS-metered fares (currently estimated distance + real duration).
-4. Driver-rates-rider (rider-rates-driver already ships) and automated
+3. Driver-rates-rider (rider-rates-driver already ships) and automated
    document expiry reminders.
-5. Bangla localisation (`intl` is already wired) and bKash for a BD launch.
+4. Bangla localisation (`intl` is already wired) and bKash for a BD launch.

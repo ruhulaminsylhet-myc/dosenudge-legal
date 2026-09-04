@@ -164,6 +164,7 @@ const PRICING = {
   searchRadiusKm: 8,
   maxDriversNotified: 10,
   requestTimeoutSec: 120,
+  maxRouteFactor: 2.5,
 };
 
 const round2 = (n) => Math.round(n * 100) / 100;

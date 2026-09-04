@@ -76,6 +76,8 @@ export interface RideDoc {
   pickup: { address: string };
   dropoff: { address: string };
   estimatedDistanceKm: number;
+  /** Distance actually charged for, once the trip's GPS meter is clamped. */
+  billedDistanceKm?: number;
   fareEstimate: Fare | null;
   finalFare: Fare | null;
   requestedAt?: Timestamp;
@@ -92,4 +94,5 @@ export interface PricingConfig {
   searchRadiusKm: number;
   maxDriversNotified: number;
   requestTimeoutSec: number;
+  maxRouteFactor: number;
 }

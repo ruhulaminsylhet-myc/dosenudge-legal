@@ -15,6 +15,7 @@ const DEFAULTS: PricingConfig = {
   searchRadiusKm: 8,
   maxDriversNotified: 10,
   requestTimeoutSec: 120,
+  maxRouteFactor: 2.5,
 };
 
 const FIELDS: {
@@ -32,6 +33,7 @@ const FIELDS: {
   { key: "searchRadiusKm", label: "Driver search radius (km)", step: "1", type: "number" },
   { key: "maxDriversNotified", label: "Max drivers notified", step: "1", type: "number" },
   { key: "requestTimeoutSec", label: "Request timeout (sec)", step: "10", type: "number" },
+  { key: "maxRouteFactor", label: "Max billable route factor", step: "0.1", type: "number" },
 ];
 
 export default function PricingPage() {
