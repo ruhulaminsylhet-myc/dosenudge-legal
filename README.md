@@ -51,7 +51,7 @@ cd functions && npm install && cd ..
 firebase deploy --only firestore,storage,functions
 ```
 
-### 3. Bootstrap the first admin
+### 3. Bootstrap the first admin and pricing
 
 ```bash
 # Create your own account first via the admin panel login page… it will fail
@@ -59,9 +59,12 @@ firebase deploy --only firestore,storage,functions
 # Firebase Console → Authentication → Add user.
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json
 node scripts/set-admin.mjs you@example.com
+node scripts/seed-pricing.mjs GBP     # or BDT for a Bangladesh launch
 ```
 
 Further admins can be granted from code via the `adminGrantAdmin` callable.
+Pricing, commission % and dispatch settings are editable from the admin panel
+afterwards — nothing is hardcoded in the apps.
 
 ### 4. Admin panel
 
@@ -77,26 +80,27 @@ add the same env vars. Cost: £0 on the hobby tier.
 
 ### 5. Flutter apps
 
+One script generates the `android/` and `ios/` folders for both apps and
+patches in everything they need — location, background-location and
+notification permissions, the photo-library usage string for document uploads,
+and the `minSdk 23` the Firebase SDKs require. Safe to re-run.
+
+```bash
+node scripts/setup-flutter-apps.mjs
+```
+
+Then point each app at your Firebase project:
+
 ```bash
 dart pub global activate flutterfire_cli
-cd apps/driver_app
-flutter create . --platforms=android,ios   # generates android/ & ios/ shells
-flutterfire configure                      # generates lib/firebase_options.dart
-flutter pub get && flutter run
-# repeat for apps/rider_app (use a *separate* Firebase Android/iOS app id, e.g.
-# com.yourco.taxi.driver and com.yourco.taxi.rider, in the same project)
+cd apps/driver_app && flutterfire configure && flutter run
+cd ../rider_app   && flutterfire configure && flutter run
 ```
 
-Android: add to `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-<uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-```
-
-iOS: add `NSLocationWhenInUseUsageDescription` to `ios/Runner/Info.plist`.
+Give the two apps **different bundle ids** (e.g. `com.yourco.taxi.driver` and
+`com.yourco.taxi.rider`) inside the *same* Firebase project. `flutterfire`
+writes `lib/firebase_options.dart`, which is gitignored because it differs per
+environment.
 
 ## Monthly cost estimate (MVP scale, ~1k rides/month)
 
