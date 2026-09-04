@@ -44,8 +44,16 @@ export interface DriverDoc {
   ratingCount: number;
   totalRides: number;
   totalEarnings: number;
-  /** Verification document download URLs, keyed by document type. */
-  documents?: Record<string, string>;
+  /** Verification documents, keyed by document type. */
+  documents?: Record<string, DriverDocumentEntry>;
+  /** Server-set when an expired document took the driver off the road. */
+  expiryBlocked?: boolean;
+}
+
+export interface DriverDocumentEntry {
+  url: string;
+  /** ISO yyyy-mm-dd. Absent for documents that don't expire. */
+  expiresAt?: string;
 }
 
 export const DRIVER_DOCUMENT_LABELS: Record<string, string> = {
@@ -53,6 +61,18 @@ export const DRIVER_DOCUMENT_LABELS: Record<string, string> = {
   insurance: "Insurance",
   vehiclePhoto: "Vehicle",
 };
+
+/** Documents the driver may not work without an in-date copy of. */
+export const EXPIRING_DOCUMENTS = ["licence", "insurance"] as const;
+
+/** Whole days until an ISO date; negative once past. */
+export function daysUntil(isoDate: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round(
+    (new Date(`${isoDate}T00:00:00`).getTime() - today.getTime()) / 86_400_000
+  );
+}
 
 export interface Fare {
   currency: string;

@@ -53,11 +53,13 @@ service cloud.firestore {
         && request.resource.data.approvalStatus == 'pending';
 
       // Driver may update own doc but can never touch approvalStatus, rating,
-      // lifetime counters, or their Stripe payout state — a driver who could
-      // set payoutsEnabled would collect card payments without Stripe ever
-      // having verified them.
+      // lifetime counters, the expired-documents block, or their Stripe payout
+      // state — a driver who could set payoutsEnabled would collect card
+      // payments without Stripe ever having verified them, and one who could
+      // clear expiryBlocked would hide their own lapsed insurance.
       allow update: if (isSelf(uid)
           && request.resource.data.approvalStatus == resource.data.approvalStatus
+          && request.resource.data.get('expiryBlocked', false) == resource.data.get('expiryBlocked', false)
           && request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
           && request.resource.data.get('totalRides', 0) == resource.data.get('totalRides', 0)
           && request.resource.data.get('totalEarnings', 0) == resource.data.get('totalEarnings', 0)

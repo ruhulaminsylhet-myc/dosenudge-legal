@@ -75,6 +75,7 @@ beforeEach(async () => {
       ratingCount: 0,
       totalRides: 0,
       totalEarnings: 0,
+      expiryBlocked: true,
     });
     await setDoc(doc(db, "rides", "openRide"), {
       riderId: RIDER,
@@ -133,6 +134,25 @@ describe("drivers collection", () => {
     await assertFails(
       updateDoc(doc(driver(), "drivers", NEAR_DRIVER), {
         stripeAccountId: "acct_attacker",
+      })
+    );
+  });
+
+  test("a driver cannot clear the expired-documents block", async () => {
+    await assertFails(
+      updateDoc(doc(driver(PENDING_DRIVER), "drivers", PENDING_DRIVER), {
+        expiryBlocked: false,
+      })
+    );
+  });
+
+  test("a driver can upload a document with its expiry date", async () => {
+    await assertSucceeds(
+      updateDoc(doc(driver(), "drivers", NEAR_DRIVER), {
+        "documents.insurance": {
+          url: "https://example.com/insurance.pdf",
+          expiresAt: "2030-01-01",
+        },
       })
     );
   });

@@ -74,17 +74,42 @@ class DriverService {
   /// Uploads a verification document to `driver_docs/{uid}/` (storage rules
   /// restrict reads to the driver themself and admins) and records its URL on
   /// the driver profile so the admin panel can review it before approval.
-  Future<void> uploadDocument(DriverDocument doc, File file) async {
+  ///
+  /// [expiresAt] is required for documents where
+  /// [DriverDocument.requiresExpiry] is true — the daily server sweep takes
+  /// the driver offline once that date passes.
+  Future<void> uploadDocument(
+    DriverDocument doc,
+    File file, {
+    DateTime? expiresAt,
+  }) async {
     final ext = file.path.split('.').last.toLowerCase();
     final ref = FirebaseStorage.instance
         .ref('driver_docs/$_uid/${doc.key}.$ext');
     await ref.putFile(file);
     final url = await ref.getDownloadURL();
     await _ref.update({
-      'documents.${doc.key}': url,
+      'documents.${doc.key}': {
+        'url': url,
+        if (expiresAt != null) 'expiresAt': _isoDate(expiresAt),
+      },
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  /// Updates only the expiry date, for a document already uploaded.
+  Future<void> setDocumentExpiry(DriverDocument doc, DateTime expiresAt) async {
+    await _ref.update({
+      'documents.${doc.key}.expiresAt': _isoDate(expiresAt),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// yyyy-mm-dd, the format the server compares against.
+  static String _isoDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   /// Returns a fresh Stripe Connect onboarding URL. Links expire, so this is
   /// called each time rather than cached.

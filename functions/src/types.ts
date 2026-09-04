@@ -46,12 +46,28 @@ export interface DriverDoc {
   totalRides: number;
   totalEarnings: number;
   /** Uploaded verification documents, keyed by type. */
-  documents?: Record<string, string>;
+  documents?: Record<string, DriverDocumentEntry>;
+  /**
+   * Set when a required document expired and the driver was taken off the road.
+   * Cleared by the admin re-approving after fresh paperwork.
+   */
+  expiryBlocked?: boolean;
+  /** Day of the last expiry warning push, so drivers aren't nagged hourly. */
+  expiryWarnedOn?: string;
   /** Stripe Connect account; server-written only. */
   stripeAccountId?: string;
   payoutsEnabled?: boolean;
   updatedAt: Timestamp;
 }
+
+export interface DriverDocumentEntry {
+  url: string;
+  /** ISO yyyy-mm-dd. Absent for documents that don't expire, e.g. a photo. */
+  expiresAt?: string;
+}
+
+/** Documents that legally must be in date for the driver to work. */
+export const EXPIRING_DOCUMENTS = ["licence", "insurance"] as const;
 
 export type PaymentStatus = "pending" | "paid" | "failed";
 

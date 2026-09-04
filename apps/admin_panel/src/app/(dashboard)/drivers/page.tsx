@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { callSetDriverApproval, firestore } from "@/lib/firebase";
-import { DRIVER_DOCUMENT_LABELS, type ApprovalStatus, type DriverDoc } from "@/lib/types";
+import {
+  DRIVER_DOCUMENT_LABELS,
+  EXPIRING_DOCUMENTS,
+  daysUntil,
+  type ApprovalStatus,
+  type DriverDoc,
+} from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
 export default function DriversPage() {
@@ -69,6 +75,7 @@ export default function DriversPage() {
               <th className="px-4 py-3">Driver</th>
               <th className="px-4 py-3">Vehicle</th>
               <th className="px-4 py-3">Documents</th>
+              <th className="px-4 py-3">Expiry</th>
               <th className="px-4 py-3">Approval</th>
               <th className="px-4 py-3">Online</th>
               <th className="px-4 py-3">Rides</th>
@@ -91,10 +98,10 @@ export default function DriversPage() {
                 <td className="px-4 py-3">
                   {d.documents && Object.keys(d.documents).length > 0 ? (
                     <div className="flex flex-wrap gap-1">
-                      {Object.entries(d.documents).map(([key, url]) => (
+                      {Object.entries(d.documents).map(([key, entry]) => (
                         <a
                           key={key}
-                          href={url}
+                          href={entry.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
@@ -106,6 +113,9 @@ export default function DriversPage() {
                   ) : (
                     <span className="text-xs text-amber-600">None uploaded</span>
                   )}
+                </td>
+                <td className="px-4 py-3">
+                  <DocumentExpiry driver={d} />
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge value={d.approvalStatus} />
@@ -143,7 +153,7 @@ export default function DriversPage() {
             ))}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                   No drivers found.
                 </td>
               </tr>
@@ -151,6 +161,51 @@ export default function DriversPage() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The soonest expiry across the documents that legally must stay in date, so a
+ * lapse is visible in the list rather than only in the driver's own app. The
+ * daily server sweep does the enforcing; this is what the operator sees.
+ */
+function DocumentExpiry({ driver }: { driver: DriverDoc }) {
+  const dated = EXPIRING_DOCUMENTS.flatMap((key) => {
+    const expiresAt = driver.documents?.[key]?.expiresAt;
+    return expiresAt ? [{ key: key as string, expiresAt }] : [];
+  });
+
+  if (dated.length === 0) {
+    return <span className="text-xs text-slate-400">No dates</span>;
+  }
+
+  const soonest = dated.reduce((a, b) =>
+    daysUntil(a.expiresAt) <= daysUntil(b.expiresAt) ? a : b
+  );
+  const days = daysUntil(soonest.expiresAt);
+  const label = DRIVER_DOCUMENT_LABELS[soonest.key] ?? soonest.key;
+
+  const tone =
+    days < 0
+      ? "bg-red-50 text-red-700"
+      : days <= 30
+        ? "bg-amber-50 text-amber-700"
+        : "bg-slate-50 text-slate-600";
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className={`w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${tone}`}>
+        {days < 0
+          ? `${label} expired`
+          : days === 0
+            ? `${label} expires today`
+            : `${label} in ${days}d`}
+      </span>
+      <span className="text-xs text-slate-400">{soonest.expiresAt}</span>
+      {driver.expiryBlocked && (
+        <span className="text-xs font-medium text-red-600">Blocked — offline</span>
+      )}
     </div>
   );
 }

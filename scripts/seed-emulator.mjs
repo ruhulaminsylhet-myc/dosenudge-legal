@@ -47,6 +47,11 @@ const PEOPLE = [
   { uid: "driver3", email: "driver3@demo.test", name: "Jamal Hossain", role: "driver", claims: { role: "driver" } },
 ];
 
+/** ISO yyyy-mm-dd n days from today — keeps demo expiry dates meaningful
+ *  however long after seeding you look at them. */
+const inDays = (n) =>
+  new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
 const DRIVERS = [
   {
     uid: "driver1",
@@ -58,9 +63,11 @@ const DRIVERS = [
     totalRides: 47,
     totalEarnings: 612.35,
     documents: {
-      licence: "https://example.com/demo/licence1.jpg",
-      insurance: "https://example.com/demo/insurance1.pdf",
-      vehiclePhoto: "https://example.com/demo/car1.jpg",
+      licence: { url: "https://example.com/demo/licence1.jpg", expiresAt: inDays(400) },
+      // Inside the renewal window, so the driver sees a warning banner and the
+      // admin list flags it amber.
+      insurance: { url: "https://example.com/demo/insurance1.pdf", expiresAt: inDays(12) },
+      vehiclePhoto: { url: "https://example.com/demo/car1.jpg" },
     },
   },
   {
@@ -73,9 +80,9 @@ const DRIVERS = [
     totalRides: 20,
     totalEarnings: 289.1,
     documents: {
-      licence: "https://example.com/demo/licence2.jpg",
-      insurance: "https://example.com/demo/insurance2.pdf",
-      vehiclePhoto: "https://example.com/demo/car2.jpg",
+      licence: { url: "https://example.com/demo/licence2.jpg", expiresAt: inDays(280) },
+      insurance: { url: "https://example.com/demo/insurance2.pdf", expiresAt: inDays(95) },
+      vehiclePhoto: { url: "https://example.com/demo/car2.jpg" },
     },
   },
   {
@@ -87,7 +94,9 @@ const DRIVERS = [
     ratingCount: 0,
     totalRides: 0,
     totalEarnings: 0,
-    documents: { licence: "https://example.com/demo/licence3.jpg" },
+    documents: {
+      licence: { url: "https://example.com/demo/licence3.jpg", expiresAt: inDays(500) },
+    },
   },
 ];
 

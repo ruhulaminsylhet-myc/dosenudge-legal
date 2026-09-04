@@ -130,6 +130,32 @@ Rider `rateRide` callable ডাকে, সেটা একটা transaction-�
 `documents` map-এ জমা হয়, আর admin panel-এর Drivers table-এ clickable link
 হিসেবে দেখায় — approve চাপার আগে admin যাচাই করে নিতে পারে।
 
+প্রতিটা entry এখন `{ url, expiresAt }` — `expiresAt` হলো ISO `yyyy-mm-dd`:
+
+```ts
+documents: {
+  licence:      { url: "…", expiresAt: "2027-03-14" },
+  insurance:    { url: "…", expiresAt: "2026-11-02" },
+  vehiclePhoto: { url: "…" },   // ছবির মেয়াদ নেই
+}
+```
+
+**Expiry enforcement:** UK-তে মেয়াদোত্তীর্ণ licence/insurance নিয়ে গাড়ি চালানো
+বেআইনি, আর platform সেই driver-কে কাজ দিলে দায় তোমার উপরেও পড়ে। তাই
+`checkDocumentExpiry` scheduled function রোজ ভোর ৬টায় চলে
+(`EXPIRING_DOCUMENTS = ['licence', 'insurance']`):
+
+- **মেয়াদ শেষ** → driver `approvalStatus: 'pending'` + `isOnline: false` +
+  `expiryBlocked: true`, সাথে push। `pending` মানে dispatch আর তাকে ride
+  offer করবে না — নতুন কাগজ upload করে admin re-approve না করা পর্যন্ত।
+- **৩০ / ১৪ / ৭ / ৩ / ১ দিন বাকি** → warning push, দিনে একবারই
+  (`expiryWarnedOn` দিয়ে dedupe), আর driver app-এ home screen-এ orange banner।
+
+`expiryBlocked` client-write বন্ধ (rules), না হলে driver নিজেই flag মুছে
+lapsed insurance লুকিয়ে ফেলতে পারত। Admin approve করলে flag clear হয় — অর্থাৎ
+admin নতুন কাগজ দেখে নিশ্চিত হয়েছে। Admin panel-এর Drivers table-এ **Expiry**
+column সবচেয়ে কাছের মেয়াদ দেখায়: লাল = শেষ, হলুদ = ৩০ দিনের ভেতর।
+
 ## 7. Payments (Stripe Connect)
 
 **কেন Connect:** টাকা rider → Stripe → driver-এর নিজের account-এ যায়, তোমার

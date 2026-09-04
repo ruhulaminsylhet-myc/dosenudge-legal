@@ -23,13 +23,14 @@ import {
   round2,
 } from "./pricing.js";
 import { sendPush, sendPushMulti } from "./notify.js";
-import type {
-  ApprovalStatus,
-  DriverDoc,
-  LatLng,
-  RideDoc,
-  UserDoc,
-  UserStatus,
+import {
+  EXPIRING_DOCUMENTS,
+  type ApprovalStatus,
+  type DriverDoc,
+  type LatLng,
+  type RideDoc,
+  type UserDoc,
+  type UserStatus,
 } from "./types.js";
 
 initializeApp();
@@ -441,6 +442,8 @@ export const adminSetDriverApproval = onCall(async (request) => {
   await driverRef.update({
     approvalStatus,
     isOnline: false,
+    // Approving is the admin confirming the new paperwork is in order.
+    expiryBlocked: approvalStatus === "approved" ? false : FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
   });
 
@@ -513,4 +516,87 @@ export const adminGrantAdmin = onCall(async (request) => {
   });
   await auth.revokeRefreshTokens(userId); // force claim refresh
   return { ok: true };
+});
+
+// ---------------------------------------------------------------------------
+// Document expiry
+// ---------------------------------------------------------------------------
+
+/** Whole days from today until an ISO yyyy-mm-dd date; negative once past. */
+function daysUntil(isoDate: string): number {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const due = new Date(`${isoDate}T00:00:00Z`);
+  return Math.round((due.getTime() - today.getTime()) / 86_400_000);
+}
+
+/**
+ * Takes drivers off the road when a legally required document lapses, and warns
+ * them before it does. Dispatching a driver whose insurance has expired puts
+ * the rider in an uninsured car and the platform on the hook for it, so this
+ * runs daily rather than relying on anyone noticing.
+ *
+ * Expired: the driver goes back to `pending`, which the app treats as
+ * not-yet-approved, and offline so dispatch stops offering them work. An admin
+ * re-approves once fresh paperwork is uploaded.
+ */
+export const checkDocumentExpiry = onSchedule("every day 06:00", async () => {
+  const approved = await db()
+    .collection("drivers")
+    .where("approvalStatus", "==", "approved")
+    .get();
+
+  const today = new Date().toISOString().slice(0, 10);
+  let blocked = 0;
+  let warned = 0;
+
+  for (const doc of approved.docs) {
+    const driver = doc.data() as DriverDoc;
+    const documents = driver.documents ?? {};
+
+    // Soonest expiry across the documents that must stay in date.
+    let soonest: number | null = null;
+    for (const key of EXPIRING_DOCUMENTS) {
+      const expiresAt = documents[key]?.expiresAt;
+      if (!expiresAt) continue;
+      const days = daysUntil(expiresAt);
+      if (soonest === null || days < soonest) soonest = days;
+    }
+    if (soonest === null) continue;
+
+    if (soonest < 0) {
+      await doc.ref.update({
+        approvalStatus: "pending",
+        isOnline: false,
+        expiryBlocked: true,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      await sendPush(driver.fcmToken, {
+        title: "You're offline — document expired",
+        body:
+          "Your licence or insurance has expired. Upload the new one to start "
+          + "driving again.",
+        data: { type: "documents_expired" },
+      });
+      blocked += 1;
+      continue;
+    }
+
+    // One warning a day at most, at the thresholds that give time to act.
+    if ([30, 14, 7, 3, 1].includes(soonest) && driver.expiryWarnedOn !== today) {
+      await doc.ref.update({ expiryWarnedOn: today });
+      await sendPush(driver.fcmToken, {
+        title: `Documents expire in ${soonest} day${soonest === 1 ? "" : "s"}`,
+        body:
+          "Upload your renewed licence or insurance before it lapses, or "
+          + "you'll be taken offline.",
+        data: { type: "documents_expiring", days: String(soonest) },
+      });
+      warned += 1;
+    }
+  }
+
+  if (blocked || warned) {
+    logger.info("document expiry sweep", { checked: approved.size, blocked, warned });
+  }
 });

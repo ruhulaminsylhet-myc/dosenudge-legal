@@ -104,6 +104,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 busy: _toggling,
                 onToggle: () => _toggleOnline(profile),
               ),
+              // The push reminder is easy to miss; this sits above the day's
+              // work until the paperwork is renewed.
+              if (profile.expiringDocuments.isNotEmpty)
+                _ExpiryWarningBanner(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DocumentsScreen()),
+                  ),
+                ),
               Expanded(
                 child: StreamBuilder<Ride?>(
                   stream: RideService.instance.activeRide(),
@@ -123,6 +131,39 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ExpiryWarningBanner extends StatelessWidget {
+  const _ExpiryWarningBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Strings.of(context);
+    return Material(
+      color: Colors.orange.shade50,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(Icons.warning_amber, color: Colors.orange.shade800),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  t.documentsExpiringSoon,
+                  style: TextStyle(color: Colors.orange.shade900),
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -244,6 +285,9 @@ class _PendingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Strings.of(context);
     final rejected = profile.approvalStatus == 'rejected';
+    // A driver pulled off the road by an expired document is not a new
+    // applicant, and telling them "under review" would just make them wait.
+    final blocked = profile.expiryBlocked && !rejected;
     return Scaffold(
       appBar: AppBar(
         title: Text(t.applicationStatus),
@@ -261,19 +305,29 @@ class _PendingScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                rejected ? Icons.cancel_outlined : Icons.hourglass_top,
+                switch ((rejected, blocked)) {
+                  (true, _) => Icons.cancel_outlined,
+                  (_, true) => Icons.event_busy,
+                  _ => Icons.hourglass_top,
+                },
                 size: 64,
-                color: rejected ? Colors.red : Colors.amber,
+                color: rejected
+                    ? Colors.red
+                    : (blocked ? Colors.deepOrange : Colors.amber),
               ),
               const SizedBox(height: 16),
               Text(
-                rejected ? t.notApproved : t.underReview,
+                rejected
+                    ? t.notApproved
+                    : (blocked ? t.documentsExpiredTitle : t.underReview),
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                rejected ? t.contactSupport : t.willNotify,
+                rejected
+                    ? t.contactSupport
+                    : (blocked ? t.documentsExpiredBody : t.willNotify),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600),
               ),

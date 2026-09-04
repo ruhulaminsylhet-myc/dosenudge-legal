@@ -117,6 +117,40 @@ class Strings {
         'Upload failed. Check your connection and try again.',
         'আপলোড হয়নি। সংযোগ দেখে আবার চেষ্টা করুন।',
       );
+  String get expiryDate => _('Expiry date', 'মেয়াদ শেষের তারিখ');
+  String get setExpiryDate =>
+      _('Set expiry date', 'মেয়াদের তারিখ দিন');
+  String get expiryMissing => _(
+        'Expiry date needed',
+        'মেয়াদের তারিখ দরকার',
+      );
+  String get expiryRequiredNotice => _(
+        'Licence and insurance must show when they run out. We remind you '
+            'before they do.',
+        'লাইসেন্স ও বিমার মেয়াদ কবে শেষ হবে তা দিতে হবে। শেষ হওয়ার '
+            'আগে আমরা মনে করিয়ে দেব।',
+      );
+  String expiresOn(String date) =>
+      _('Valid until $date', '$date পর্যন্ত বৈধ');
+  String expiresInDays(int days) => _(
+        'Expires in $days day${days == 1 ? '' : 's'}',
+        '$days দিনে মেয়াদ শেষ',
+      );
+  String get expired => _('Expired', 'মেয়াদ শেষ');
+  String get documentsExpiredTitle => _(
+        'You are offline — a document expired',
+        'আপনি অফলাইন — একটি কাগজের মেয়াদ শেষ',
+      );
+  String get documentsExpiredBody => _(
+        'Upload the renewed document with its new expiry date. Our team '
+            'puts you back online once it checks out.',
+        'নতুন মেয়াদসহ কাগজটি আপলোড করুন। যাচাই হলে আমাদের টিম '
+            'আপনাকে আবার অনলাইনে ফিরিয়ে আনবে।',
+      );
+  String get documentsExpiringSoon => _(
+        'A document expires soon — renew it before you are taken offline.',
+        'একটি কাগজের মেয়াদ শেষ হতে চলেছে — অফলাইন হওয়ার আগে নবায়ন করুন।',
+      );
   String get drivingLicence => _('Driving licence', 'ড্রাইভিং লাইসেন্স');
   String get insuranceCertificate =>
       _('Insurance certificate', 'বিমার সনদ');

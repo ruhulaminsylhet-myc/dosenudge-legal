@@ -17,7 +17,8 @@ A complete three-tier ride-hailing MVP:
 - **Riders** register, get a fare estimate, request a taxi, track status live,
   rate the driver afterwards, and see their history.
 - **Drivers** apply with vehicle details, upload verification documents
-  (licence, insurance, vehicle photo), wait for admin approval, go online
+  (licence, insurance, vehicle photo — with the expiry date on the first two),
+  wait for admin approval, go online
   (live GPS + geohash), receive nearby ride offers via push, accept atomically,
   drive the trip through `accepted → arrived → in_progress → completed`, and see earnings.
   The trip is metered by GPS, so the fare reflects the route actually driven.
@@ -30,7 +31,10 @@ A complete three-tier ride-hailing MVP:
 - **Server** matches each request to the nearest online approved drivers
   (geohash radius query), computes fares from `config/pricing`, settles
   completed trips into an earnings ledger, sends all push notifications, and
-  expires unanswered requests.
+  expires unanswered requests. It also sweeps driver paperwork daily: licences
+  and insurance get renewal reminders at 30/14/7/3/1 days, and a driver whose
+  document actually lapses is taken offline until an admin approves the
+  replacement — nobody dispatches a rider into an uninsured car.
 - **Payments (Stripe Connect)** — drivers onboard for payouts in-app; riders pay
   by card on Stripe Checkout after the trip. Your commission is taken
   automatically as an application fee and the rest lands in the driver's
@@ -148,14 +152,14 @@ NEXT_PUBLIC_USE_EMULATOR=true npm run dev
 ```
 
 Sign in at <http://localhost:3000> with **admin@demo.test / demo1234**. You get
-3 drivers (one pending approval with documents to review), 5 rides across every
-status, and GBP pricing — enough to click through the whole operator flow before
-touching a real project.
+3 drivers (one pending approval with documents to review, one with insurance
+expiring in 12 days), 5 rides across every status, and GBP pricing — enough to
+click through the whole operator flow before touching a real project.
 
 ## Tests
 
 Security rules are the main thing standing between a driver and someone else's
-data, so they have their own suite (39 assertions) that runs against the
+data, so they have their own suite (41 assertions) that runs against the
 Firestore emulator — no project or credentials needed:
 
 ```bash
@@ -165,8 +169,9 @@ cd tests && npm install && npm test
 
 It covers who may read driver profiles and open ride requests, every legal and
 illegal ride-status transition, which fields a client may write on a ride, the
-earnings ledger being server-only, self-promotion to admin, and drivers
-enabling their own Stripe payouts. CI runs it on every push.
+earnings ledger being server-only, self-promotion to admin, drivers enabling
+their own Stripe payouts, and drivers clearing their own expired-document
+block. CI runs it on every push.
 
 ## Monthly cost estimate (MVP scale, ~1k rides/month)
 
@@ -183,6 +188,5 @@ enabling their own Stripe payouts. CI runs it on every push.
 1. Saved cards + automatic charge on trip end (today the rider taps to pay on
    Stripe Checkout).
 2. In-app live map (`google_maps_flutter`) + driver ETA.
-3. Driver-rates-rider (rider-rates-driver already ships) and automated
-   document expiry reminders.
+3. Driver-rates-rider (rider-rates-driver already ships).
 4. bKash / Nagad for a Bangladesh launch (Stripe covers UK cards today).
