@@ -45,6 +45,7 @@ class Ride {
   final Fare? finalFare;
   final Timestamp? requestedAt;
   final int? rating;
+  final DriverInfo? driverInfo;
 
   const Ride({
     required this.id,
@@ -58,6 +59,7 @@ class Ride {
     required this.finalFare,
     required this.requestedAt,
     required this.rating,
+    required this.driverInfo,
   });
 
   factory Ride.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -75,6 +77,7 @@ class Ride {
       finalFare: Fare.fromMap(d['finalFare'] as Map<String, dynamic>?),
       requestedAt: d['requestedAt'] as Timestamp?,
       rating: (d['rating'] as num?)?.toInt(),
+      driverInfo: DriverInfo.fromMap(d['driverInfo'] as Map<String, dynamic>?),
     );
   }
 
@@ -84,34 +87,29 @@ class Ride {
       status == 'in_progress';
 }
 
+/// Driver details the rider is allowed to see. Written onto the ride document
+/// by the accept trigger — the rider app never reads the drivers collection,
+/// which also holds phone numbers and live location.
 class DriverInfo {
   final String name;
-  final String phone;
   final String vehicleLabel;
   final double rating;
   final int ratingCount;
-  final GeoPoint? location;
 
   const DriverInfo({
     required this.name,
-    required this.phone,
     required this.vehicleLabel,
     required this.rating,
     required this.ratingCount,
-    required this.location,
   });
 
-  factory DriverInfo.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final d = doc.data() ?? {};
-    final v = (d['vehicle'] ?? {}) as Map<String, dynamic>;
+  static DriverInfo? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
     return DriverInfo(
-      name: (d['name'] ?? 'Driver') as String,
-      phone: (d['phone'] ?? '') as String,
-      vehicleLabel:
-          '${v['color'] ?? ''} ${v['make'] ?? ''} ${v['model'] ?? ''} · ${v['plate'] ?? ''}',
-      rating: ((d['rating'] ?? 0) as num).toDouble(),
-      ratingCount: ((d['ratingCount'] ?? 0) as num).toInt(),
-      location: d['location'] as GeoPoint?,
+      name: (m['name'] ?? 'Driver') as String,
+      vehicleLabel: (m['vehicleLabel'] ?? '') as String,
+      rating: ((m['rating'] ?? 0) as num).toDouble(),
+      ratingCount: ((m['ratingCount'] ?? 0) as num).toInt(),
     );
   }
 }

@@ -43,8 +43,10 @@ service cloud.firestore {
 
     // ---------- drivers ----------
     match /drivers/{uid} {
-      // Riders need to see assigned-driver name/vehicle/location during a ride.
-      allow read: if signedIn();
+      // Drivers see only their own profile. Riders never read this collection:
+      // the name/vehicle/rating they need is denormalised onto the ride doc by
+      // onRideUpdated, so phone numbers and live locations stay private.
+      allow read: if isSelf(uid) || isAdmin();
 
       // Driver creates own profile; approval always starts 'pending'.
       allow create: if isSelf(uid)
@@ -71,8 +73,11 @@ service cloud.firestore {
       }
 
       allow read: if isParticipant() || isAdmin()
-        // Approved online drivers must be able to read open requests offered to them.
-        || (isDriver() && resource.data.status == 'requested');
+        // A driver sees an open request only if dispatch actually offered it to
+        // them — otherwise every driver could read every rider's addresses.
+        || (isDriver()
+            && resource.data.status == 'requested'
+            && request.auth.uid in resource.data.offeredTo);
 
       // Rider creates a ride request for themself, always starting at 'requested'.
       allow create: if signedIn()
@@ -86,6 +91,7 @@ service cloud.firestore {
         // Driver claims an open request (atomic: only if still unassigned).
         || (isDriver()
             && resource.data.status == 'requested'
+            && request.auth.uid in resource.data.offeredTo
             && resource.data.driverId == null
             && request.resource.data.driverId == request.auth.uid
             && request.resource.data.status == 'accepted'

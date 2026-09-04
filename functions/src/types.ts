@@ -85,6 +85,13 @@ export interface RideDoc {
   completedAt?: Timestamp;
   cancelledBy?: "rider" | "driver" | "system" | "admin";
   rating?: number;
+  /** Denormalised driver fields the rider may see; written on accept. */
+  driverInfo?: {
+    name: string;
+    vehicleLabel: string;
+    rating: number;
+    ratingCount: number;
+  } | null;
 }
 
 export interface PricingConfig {

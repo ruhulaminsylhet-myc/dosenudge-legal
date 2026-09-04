@@ -158,9 +158,6 @@ class RiderService {
     });
   }
 
-  Stream<DriverInfo> driverStream(String driverId) =>
-      _db.doc('drivers/$driverId').snapshots().map(DriverInfo.fromDoc);
-
   Future<String> displayName() async {
     final snap = await _db.doc('users/$_uid').get();
     return (snap.data()?['name'] ?? 'Rider') as String;

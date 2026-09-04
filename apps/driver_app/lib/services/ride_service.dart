@@ -10,11 +10,13 @@ class RideService {
   final _db = FirebaseFirestore.instance;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
-  /// Open requests this driver can claim (dispatch pushes FCM too; this stream
-  /// keeps the in-app list live).
+  /// Open requests dispatch offered to *this* driver (it picks the nearest
+  /// drivers to the pickup point). Security rules enforce the same scope, so a
+  /// driver can never read requests outside their area.
   Stream<List<Ride>> openRequests() => _db
       .collection('rides')
       .where('status', isEqualTo: 'requested')
+      .where('offeredTo', arrayContains: _uid)
       .orderBy('requestedAt', descending: true)
       .limit(20)
       .snapshots()

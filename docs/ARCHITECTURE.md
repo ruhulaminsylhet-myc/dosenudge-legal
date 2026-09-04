@@ -56,6 +56,14 @@ plus `cancelled` (rider/driver/admin/system) আর `expired` (timeout এ ক�
    settle) শুধু এখান দিয়েই হয়। Suspend করলে Firebase Auth account **disable**
    + refresh token revoke হয়, তাই user সব device থেকে সাথে সাথে bad হয়ে যায়।
 
+**Data minimisation (UK GDPR):** কেউ প্রয়োজনের বেশি data পড়তে পারে না —
+- `drivers` collection-এ driver-এর phone আর live location আছে, তাই সেটা শুধু
+  **নিজে + admin** পড়তে পারে। Rider-কে যা দেখাতে হয় (নাম, গাড়ি, rating) সেটা
+  accept-এর সময় function ride doc-এর `driverInfo` field-এ copy করে দেয়।
+- একটা open ride request শুধু **যে driver দের offer করা হয়েছে** (`offeredTo`
+  array) তারাই পড়তে ও accept করতে পারে। তাই London-এর driver Manchester-এর
+  rider-এর address কখনো দেখবে না — rules আর app query দুই জায়গাতেই enforce করা।
+
 ## 4. Dispatch engine (driver matching)
 
 - Driver online হলে app প্রতি ~25 metre এ `drivers/{uid}` doc এ

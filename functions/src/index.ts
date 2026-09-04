@@ -153,12 +153,25 @@ export const onRideUpdated = onDocumentUpdated("rides/{rideId}", async (event) =
 
   switch (after.status) {
     case "accepted": {
-      await ref.update({ acceptedAt: FieldValue.serverTimestamp() });
       const driverSnap = await db().doc(`drivers/${after.driverId}`).get();
       const driver = driverSnap.data() as DriverDoc | undefined;
       const vehicle = driver
         ? `${driver.vehicle.color} ${driver.vehicle.make} ${driver.vehicle.model} (${driver.vehicle.plate})`
         : "your driver";
+      // Copy the handful of driver fields the rider is entitled to see onto the
+      // ride itself, so the rider app never reads the drivers collection (which
+      // also holds phone numbers and live location).
+      await ref.update({
+        acceptedAt: FieldValue.serverTimestamp(),
+        driverInfo: driver
+          ? {
+              name: driver.name,
+              vehicleLabel: vehicle,
+              rating: driver.rating ?? 0,
+              ratingCount: driver.ratingCount ?? 0,
+            }
+          : null,
+      });
       await sendPush(riderToken, {
         title: "Driver on the way",
         body: `${driver?.name ?? "Your driver"} is coming in a ${vehicle}.`,

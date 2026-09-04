@@ -63,26 +63,17 @@ class RideScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (ride.driverId != null) ...[
+                if (ride.driverInfo != null) ...[
                   const SizedBox(height: 12),
-                  StreamBuilder<DriverInfo>(
-                    stream:
-                        RiderService.instance.driverStream(ride.driverId!),
-                    builder: (context, driverSnap) {
-                      final driver = driverSnap.data;
-                      if (driver == null) return const SizedBox.shrink();
-                      return Card(
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                              child: Icon(Icons.person)),
-                          title: Text(driver.name),
-                          subtitle: Text(driver.vehicleLabel),
-                          trailing: driver.ratingCount > 0
-                              ? Text('${driver.rating.toStringAsFixed(1)} ⭐')
-                              : null,
-                        ),
-                      );
-                    },
+                  Card(
+                    child: ListTile(
+                      leading: const CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(ride.driverInfo!.name),
+                      subtitle: Text(ride.driverInfo!.vehicleLabel),
+                      trailing: ride.driverInfo!.ratingCount > 0
+                          ? Text('${ride.driverInfo!.rating.toStringAsFixed(1)} ⭐')
+                          : null,
+                    ),
                   ),
                 ],
                 if (ride.status == 'completed' && ride.driverId != null)
