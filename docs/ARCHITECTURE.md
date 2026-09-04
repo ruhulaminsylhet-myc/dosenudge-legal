@@ -113,7 +113,38 @@ Rider `rateRide` callable ডাকে, সেটা একটা transaction-�
 `documents` map-এ জমা হয়, আর admin panel-এর Drivers table-এ clickable link
 হিসেবে দেখায় — approve চাপার আগে admin যাচাই করে নিতে পারে।
 
-## 7. Admin panel
+## 7. Payments (Stripe Connect)
+
+**কেন Connect:** টাকা rider → Stripe → driver-এর নিজের account-এ যায়, তোমার
+commission মাঝখানে `application_fee_amount` হিসেবে কেটে যায়। তাই তোমাকে আলাদা
+করে driver-দের টাকা পাঠাতে হয় না, আর তোমার account-এ কারো টাকা জমা থাকে না
+(regulatory ঝামেলা অনেক কম)।
+
+```
+Driver → createDriverPayoutAccount → Stripe Express onboarding (browser)
+                                         │ account.updated webhook
+                                         ▼
+                              drivers/{uid}.payoutsEnabled = true
+
+Rider (trip শেষে) → createRideCheckout → Stripe Checkout page
+                                         │ checkout.session.completed webhook
+                                         ▼
+                              rides/{id}.payment.status = 'paid'
+                              commission → তোমার account
+                              বাকিটা → driver-এর account
+```
+
+**দুটো গুরুত্বপূর্ণ rule:**
+1. `payment.status` **শুধু signature-verified webhook** থেকে set হয় — rider
+   success URL-এ ফিরে এলো মানে টাকা এসেছে, এমন ধরা হয় না।
+2. `drivers.payoutsEnabled` আর `stripeAccountId` client লিখতে পারে না (rules-এ
+   blocked, test করা) — নইলে driver নিজে flag on করে card payment নিতে পারত
+   অথচ Stripe তাকে verify-ই করেনি।
+
+Driver payout setup না করলে checkout fail করে আর rider-কে cash দিতে বলা হয় —
+MVP-তে এটাই intended behaviour।
+
+## 8. Admin panel
 
 Next.js client app — Firebase JS SDK দিয়ে সরাসরি Firestore পড়ে (admin claim
 rules এ check হয়), আর privileged action গুলোতে callable functions ডাকে
@@ -124,7 +155,7 @@ Pages: Dashboard (aggregate counts), Drivers (approve/reject + live online
 status), Users (search + suspend/reactivate), Rides (live `onSnapshot` feed),
 Pricing (config editor)।
 
-## 8. কেন এই decisions (trade-offs)
+## 9. কেন এই decisions (trade-offs)
 
 | Decision | কারণ |
 |---|---|
@@ -132,4 +163,5 @@ Pricing (config editor)।
 | Native geocoding (`geocoding` pkg) | Address→latlng free, on-device |
 | Callable functions, REST API না | Auth+claims built-in, CORS/token plumbing নেই |
 | Firestore rules এ status machine | Function round-trip ছাড়াই instant, offline-safe transitions |
-| Cash payment MVP | Stripe Connect onboarding একটা আলাদা মাইলফলক — আগে liquidity প্রমাণ করো |
+| Stripe Checkout, in-app SDK না | flutter_stripe-এর platform config ছাড়াই কাজ করে; hosted page = কম PCI scope |
+| Destination charge (application fee) | Driver payout automatic, তোমার account-এ কারো টাকা জমা থাকে না |

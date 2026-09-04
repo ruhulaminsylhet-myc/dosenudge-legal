@@ -28,6 +28,11 @@ A complete three-tier ride-hailing MVP:
   (geohash radius query), computes fares from `config/pricing`, settles
   completed trips into an earnings ledger, sends all push notifications, and
   expires unanswered requests.
+- **Payments (Stripe Connect)** — drivers onboard for payouts in-app; riders pay
+  by card on Stripe Checkout after the trip. Your commission is taken
+  automatically as an application fee and the rest lands in the driver's
+  account, so there is no payout run to manage. Cash still works: if a driver
+  hasn't finished payout setup, the rider is told to settle in cash.
 
 Security: role-based access via Firebase custom claims (`role`, `admin`) +
 Firestore rules. Clients can never grant themselves a role, change approval
@@ -66,7 +71,29 @@ Further admins can be granted from code via the `adminGrantAdmin` callable.
 Pricing, commission % and dispatch settings are editable from the admin panel
 afterwards — nothing is hardcoded in the apps.
 
-### 4. Admin panel
+### 4. Payments (optional for a cash-only launch)
+
+Create a Stripe account, enable **Connect**, then:
+
+```bash
+firebase functions:secrets:set STRIPE_SECRET_KEY      # sk_live_… or sk_test_…
+firebase functions:secrets:set STRIPE_WEBHOOK_SECRET  # whsec_… (step 3 below)
+```
+
+1. Add `PUBLIC_RETURN_URL=https://yourdomain.com` to `functions/.env` — where
+   Stripe sends drivers and riders back after onboarding/checkout.
+2. Deploy: `firebase deploy --only functions`.
+3. In the Stripe dashboard → Developers → Webhooks, add the deployed
+   `stripeWebhook` URL and subscribe to `checkout.session.completed`,
+   `checkout.session.async_payment_failed`, `checkout.session.expired` and
+   `account.updated`. Copy the signing secret into the secret above and
+   redeploy.
+
+Test it with Stripe's test keys and card `4242 4242 4242 4242` before going
+live. Commission comes from `config/pricing.commissionPct` — the same number the
+earnings ledger uses.
+
+### 5. Admin panel
 
 ```bash
 cd apps/admin_panel
@@ -78,7 +105,7 @@ npm run dev                  # http://localhost:3000
 Deploy to Vercel: import the repo, set root directory to `apps/admin_panel`,
 add the same env vars. Cost: £0 on the hobby tier.
 
-### 5. Flutter apps
+### 6. Flutter apps
 
 One script generates the `android/` and `ios/` folders for both apps and
 patches in everything they need — location, background-location and
@@ -123,7 +150,7 @@ touching a real project.
 ## Tests
 
 Security rules are the main thing standing between a driver and someone else's
-data, so they have their own suite (34 assertions) that runs against the
+data, so they have their own suite (35 assertions) that runs against the
 Firestore emulator — no project or credentials needed:
 
 ```bash
@@ -133,8 +160,8 @@ cd tests && npm install && npm test
 
 It covers who may read driver profiles and open ride requests, every legal and
 illegal ride-status transition, which fields a client may write on a ride, the
-earnings ledger being server-only, and self-promotion to admin. CI runs it on
-every push.
+earnings ledger being server-only, self-promotion to admin, and drivers
+enabling their own Stripe payouts. CI runs it on every push.
 
 ## Monthly cost estimate (MVP scale, ~1k rides/month)
 
@@ -143,12 +170,13 @@ every push.
 | Firestore + Functions + FCM (Blaze free allowances) | ~£0–5 |
 | Vercel hobby (admin panel) | £0 |
 | Google Maps API | £0 — MVP deep-links to the Maps app instead |
-| **Total** | **≈ £0–5/month** |
+| Stripe | no monthly fee; 1.5% + 20p per UK card charge, taken from the fare |
+| **Total** | **≈ £0–5/month** + Stripe's per-transaction cut |
 
 ## Roadmap (deliberately not in MVP)
 
-1. **Payments** — Stripe Connect: rider pays in-app, automatic driver payouts,
-   commission collected at charge time (currently cash + ledger).
+1. Saved cards + automatic charge on trip end (today the rider taps to pay on
+   Stripe Checkout).
 2. In-app live map (`google_maps_flutter`) + driver ETA.
 3. Actual GPS-metered fares (currently estimated distance + real duration).
 4. Driver-rates-rider (rider-rates-driver already ships) and automated

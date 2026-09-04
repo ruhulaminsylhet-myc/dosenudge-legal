@@ -45,7 +45,24 @@ export interface DriverDoc {
   ratingCount: number;
   totalRides: number;
   totalEarnings: number;
+  /** Uploaded verification documents, keyed by type. */
+  documents?: Record<string, string>;
+  /** Stripe Connect account; server-written only. */
+  stripeAccountId?: string;
+  payoutsEnabled?: boolean;
   updatedAt: Timestamp;
+}
+
+export type PaymentStatus = "pending" | "paid" | "failed";
+
+export interface RidePayment {
+  status: PaymentStatus;
+  provider: "stripe";
+  checkoutSessionId?: string;
+  paymentIntentId?: string | null;
+  amount: number;
+  currency: string;
+  paidAt?: Timestamp;
 }
 
 export interface LatLng {
@@ -85,6 +102,8 @@ export interface RideDoc {
   completedAt?: Timestamp;
   cancelledBy?: "rider" | "driver" | "system" | "admin";
   rating?: number;
+  /** Set once the rider starts checkout; only the webhook marks it paid. */
+  payment?: RidePayment;
   /** Denormalised driver fields the rider may see; written on accept. */
   driverInfo?: {
     name: string;

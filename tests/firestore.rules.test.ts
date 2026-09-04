@@ -62,6 +62,8 @@ beforeEach(async () => {
       ratingCount: 10,
       totalRides: 10,
       totalEarnings: 250,
+      stripeAccountId: "acct_demo",
+      payoutsEnabled: true,
     });
     await setDoc(doc(db, "drivers", PENDING_DRIVER), {
       name: "Driver Three",
@@ -121,6 +123,17 @@ describe("drivers collection", () => {
     await assertFails(updateDoc(doc(driver(), "drivers", NEAR_DRIVER), { rating: 5 }));
     await assertFails(
       updateDoc(doc(driver(), "drivers", NEAR_DRIVER), { totalEarnings: 99999 })
+    );
+  });
+
+  test("a driver cannot enable their own Stripe payouts", async () => {
+    await assertFails(
+      updateDoc(doc(driver(), "drivers", NEAR_DRIVER), { payoutsEnabled: false })
+    );
+    await assertFails(
+      updateDoc(doc(driver(), "drivers", NEAR_DRIVER), {
+        stripeAccountId: "acct_attacker",
+      })
     );
   });
 

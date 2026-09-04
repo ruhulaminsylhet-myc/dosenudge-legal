@@ -70,6 +70,7 @@ export default function RidesPage() {
               <th className="px-4 py-3">Route</th>
               <th className="px-4 py-3">Distance</th>
               <th className="px-4 py-3">Fare</th>
+              <th className="px-4 py-3">Payment</th>
               <th className="px-4 py-3">Status</th>
             </tr>
           </thead>
@@ -98,6 +99,13 @@ export default function RidesPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
+                    {r.payment ? (
+                      <StatusBadge value={r.payment.status} />
+                    ) : (
+                      <span className="text-xs text-slate-400">cash</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
                     <StatusBadge value={r.status} />
                   </td>
                 </tr>
@@ -105,7 +113,7 @@ export default function RidesPage() {
             })}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
                   No rides here yet.
                 </td>
               </tr>

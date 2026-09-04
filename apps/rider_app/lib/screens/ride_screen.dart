@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/models.dart';
 import '../services/rider_service.dart';
@@ -76,8 +77,10 @@ class RideScreen extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (ride.status == 'completed' && ride.driverId != null)
+                if (ride.status == 'completed' && ride.driverId != null) ...[
+                  _PaymentCard(ride: ride),
                   _RatingCard(ride: ride),
+                ],
                 const Spacer(),
                 if (ride.status == 'requested' ||
                     ride.status == 'accepted' ||
@@ -100,6 +103,98 @@ class RideScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Card payment for a finished trip. Checkout happens on Stripe's hosted page,
+/// and only the webhook flips the ride to paid — returning from the browser
+/// proves nothing on its own.
+class _PaymentCard extends StatefulWidget {
+  const _PaymentCard({required this.ride});
+
+  final Ride ride;
+
+  @override
+  State<_PaymentCard> createState() => _PaymentCardState();
+}
+
+class _PaymentCardState extends State<_PaymentCard> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _pay() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final url = await RiderService.instance.checkoutUrl(widget.ride.id);
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      // The commonest case is a driver who hasn't finished payout setup, and
+      // the callable explains that in its message.
+      setState(() => _error = 'Card payment unavailable — please pay in cash.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final payment = widget.ride.payment;
+    if (payment?.isPaid ?? false) {
+      return Card(
+        margin: const EdgeInsets.only(top: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.verified, color: Colors.green),
+              const SizedBox(width: 8),
+              Text('Paid — ${payment!.currency} '
+                  '${payment.amount.toStringAsFixed(2)}'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final fare = widget.ride.finalFare;
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Pay your fare',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              payment?.status == 'failed'
+                  ? 'That payment did not go through. Try again or pay in cash.'
+                  : 'Pay securely by card, or settle in cash with your driver.',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                icon: const Icon(Icons.credit_card),
+                label: Text(_busy
+                    ? 'Opening…'
+                    : 'Pay ${fare?.label ?? ''} by card'),
+                onPressed: _busy ? null : _pay,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -61,6 +61,9 @@ class DriverProfile {
   /// Uploaded document download URLs, keyed by [DriverDocument.key].
   final Map<String, String> documents;
 
+  /// True once Stripe has verified the driver and payouts can be sent.
+  final bool payoutsEnabled;
+
   const DriverProfile({
     required this.id,
     required this.name,
@@ -73,6 +76,7 @@ class DriverProfile {
     required this.totalRides,
     required this.totalEarnings,
     required this.documents,
+    required this.payoutsEnabled,
   });
 
   bool get hasAllDocuments =>
@@ -94,6 +98,7 @@ class DriverProfile {
       documents: ((d['documents'] ?? const <String, dynamic>{})
               as Map<String, dynamic>)
           .map((k, v) => MapEntry(k, v as String)),
+      payoutsEnabled: (d['payoutsEnabled'] ?? false) as bool,
     );
   }
 }

@@ -1,8 +1,8 @@
 import 'dart:async';
-
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geolocator/geolocator.dart';
@@ -15,6 +15,8 @@ class DriverService {
   static final instance = DriverService._();
 
   final _db = FirebaseFirestore.instance;
+  // Region must match setGlobalOptions in functions/src/index.ts.
+  final _functions = FirebaseFunctions.instanceFor(region: 'europe-west2');
   StreamSubscription<Position>? _locationSub;
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
@@ -82,6 +84,22 @@ class DriverService {
       'documents.${doc.key}': url,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Returns a fresh Stripe Connect onboarding URL. Links expire, so this is
+  /// called each time rather than cached.
+  Future<String> payoutOnboardingUrl() async {
+    final result =
+        await _functions.httpsCallable('createDriverPayoutAccount').call();
+    return (result.data as Map)['url'] as String;
+  }
+
+  /// Onboarding finishes in a browser, so re-check with Stripe on return
+  /// instead of waiting for the webhook to land.
+  Future<bool> refreshPayoutStatus() async {
+    final result =
+        await _functions.httpsCallable('refreshDriverPayoutStatus').call();
+    return (result.data as Map)['payoutsEnabled'] as bool;
   }
 
   Future<void> saveFcmToken(String token) async {

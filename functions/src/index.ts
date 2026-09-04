@@ -29,6 +29,14 @@ import type {
 initializeApp();
 setGlobalOptions({ region: "europe-west2", maxInstances: 10 });
 
+// Stripe Connect payouts and rider checkout.
+export {
+  createDriverPayoutAccount,
+  refreshDriverPayoutStatus,
+  createRideCheckout,
+  stripeWebhook,
+} from "./payments.js";
+
 const db = () => getFirestore();
 
 // ---------------------------------------------------------------------------

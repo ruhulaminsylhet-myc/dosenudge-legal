@@ -149,6 +149,16 @@ class RiderService {
       .doc('rides/$rideId')
       .update({'status': 'cancelled', 'cancelledBy': 'rider'});
 
+  /// Returns a Stripe Checkout URL for a completed, unpaid ride. The platform
+  /// commission is taken as an application fee and the rest goes straight to
+  /// the driver's connected account.
+  Future<String> checkoutUrl(String rideId) async {
+    final result = await _functions
+        .httpsCallable('createRideCheckout')
+        .call({'rideId': rideId});
+    return (result.data as Map)['url'] as String;
+  }
+
   /// Ratings go through a callable: security rules block clients from writing
   /// the driver's rating average directly.
   Future<void> rateRide(String rideId, int rating) async {

@@ -61,6 +61,12 @@ export interface Fare {
   driverPayout: number;
 }
 
+export interface RidePayment {
+  status: "pending" | "paid" | "failed";
+  amount: number;
+  currency: string;
+}
+
 export interface RideDoc {
   id: string;
   riderId: string;
@@ -73,6 +79,7 @@ export interface RideDoc {
   fareEstimate: Fare | null;
   finalFare: Fare | null;
   requestedAt?: Timestamp;
+  payment?: RidePayment;
 }
 
 export interface PricingConfig {

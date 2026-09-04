@@ -52,13 +52,17 @@ service cloud.firestore {
       allow create: if isSelf(uid)
         && request.resource.data.approvalStatus == 'pending';
 
-      // Driver may update own doc but can never touch approvalStatus,
-      // rating or lifetime counters (server/admin-owned fields).
+      // Driver may update own doc but can never touch approvalStatus, rating,
+      // lifetime counters, or their Stripe payout state — a driver who could
+      // set payoutsEnabled would collect card payments without Stripe ever
+      // having verified them.
       allow update: if (isSelf(uid)
           && request.resource.data.approvalStatus == resource.data.approvalStatus
           && request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
           && request.resource.data.get('totalRides', 0) == resource.data.get('totalRides', 0)
-          && request.resource.data.get('totalEarnings', 0) == resource.data.get('totalEarnings', 0))
+          && request.resource.data.get('totalEarnings', 0) == resource.data.get('totalEarnings', 0)
+          && request.resource.data.get('payoutsEnabled', false) == resource.data.get('payoutsEnabled', false)
+          && request.resource.data.get('stripeAccountId', '') == resource.data.get('stripeAccountId', ''))
         || isAdmin();
 
       allow delete: if isAdmin();

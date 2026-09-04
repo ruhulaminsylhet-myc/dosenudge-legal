@@ -33,6 +33,30 @@ class Fare {
   String get label => '$currency ${total.toStringAsFixed(2)}';
 }
 
+/// Payment state for a ride. Only the Stripe webhook ever sets 'paid'.
+class RidePayment {
+  final String status; // pending | paid | failed
+  final double amount;
+  final String currency;
+
+  const RidePayment({
+    required this.status,
+    required this.amount,
+    required this.currency,
+  });
+
+  static RidePayment? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    return RidePayment(
+      status: (m['status'] ?? 'pending') as String,
+      amount: ((m['amount'] ?? 0) as num).toDouble(),
+      currency: (m['currency'] ?? '') as String,
+    );
+  }
+
+  bool get isPaid => status == 'paid';
+}
+
 class Ride {
   final String id;
   final String riderId;
@@ -46,6 +70,7 @@ class Ride {
   final Timestamp? requestedAt;
   final int? rating;
   final DriverInfo? driverInfo;
+  final RidePayment? payment;
 
   const Ride({
     required this.id,
@@ -60,6 +85,7 @@ class Ride {
     required this.requestedAt,
     required this.rating,
     required this.driverInfo,
+    required this.payment,
   });
 
   factory Ride.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -78,6 +104,7 @@ class Ride {
       requestedAt: d['requestedAt'] as Timestamp?,
       rating: (d['rating'] as num?)?.toInt(),
       driverInfo: DriverInfo.fromMap(d['driverInfo'] as Map<String, dynamic>?),
+      payment: RidePayment.fromMap(d['payment'] as Map<String, dynamic>?),
     );
   }
 
