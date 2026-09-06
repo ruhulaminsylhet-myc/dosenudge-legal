@@ -159,16 +159,28 @@ class _EarningsList extends StatelessWidget {
                 itemBuilder: (context, i) {
                   final e = entries[i];
                   return ListTile(
-                    leading: const Icon(Icons.check_circle_outline,
-                        color: Colors.green),
+                    // A cancellation fee is money for a journey that never
+                    // happened, so it reads differently from a completed trip.
+                    leading: Icon(
+                      e.isCancellationFee
+                          ? Icons.money_off
+                          : Icons.check_circle_outline,
+                      color: e.isCancellationFee
+                          ? Colors.orange
+                          : Colors.green,
+                    ),
                     title: Text(
                       '${e.currency} ${e.netPayout.toStringAsFixed(2)}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    subtitle: Text(t.fareAndCommission(
-                      e.grossFare.toStringAsFixed(2),
-                      e.commission.toStringAsFixed(2),
-                    )),
+                    subtitle: Text(
+                      e.isCancellationFee
+                          ? t.cancellationFeeEarned
+                          : t.fareAndCommission(
+                              e.grossFare.toStringAsFixed(2),
+                              e.commission.toStringAsFixed(2),
+                            ),
+                    ),
                     trailing: Text(
                       e.createdAt != null
                           ? dateFmt.format(e.createdAt!.toDate())

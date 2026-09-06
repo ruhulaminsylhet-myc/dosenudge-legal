@@ -126,6 +126,34 @@ export const refreshDriverPayoutStatus = onCall(
  * commission is taken as an application fee and the remainder is transferred to
  * the driver's connected account, so payouts need no separate bookkeeping.
  */
+/**
+ * What the rider owes on this ride, if anything: the fare of a completed trip,
+ * or the fee for a late cancellation. Both amounts are written by the server —
+ * nothing here is taken from the client.
+ */
+function billableCharge(
+  ride: RideDoc
+): { amount: number; commission: number; currency: string; name: string } | null {
+  if (ride.status === "completed" && ride.finalFare) {
+    return {
+      amount: ride.finalFare.total,
+      commission: ride.finalFare.commission,
+      currency: ride.finalFare.currency,
+      name: "Taxi fare",
+    };
+  }
+  if (ride.status === "cancelled" && ride.cancellationCharge) {
+    const c = ride.cancellationCharge;
+    return {
+      amount: c.amount,
+      commission: c.commission,
+      currency: c.currency,
+      name: "Cancellation fee",
+    };
+  }
+  return null;
+}
+
 export const createRideCheckout = onCall(
   { secrets: [STRIPE_SECRET_KEY] },
   async (request) => {
@@ -139,15 +167,21 @@ export const createRideCheckout = onCall(
     if (ride.riderId !== request.auth.uid) {
       throw new HttpsError("permission-denied", "This is not your ride.");
     }
-    if (ride.status !== "completed") {
-      throw new HttpsError("failed-precondition", "The trip is not finished yet.");
-    }
     if (ride.payment?.status === "paid") {
       throw new HttpsError("already-exists", "This ride is already paid.");
     }
-    const fare = ride.finalFare;
-    if (!fare) {
-      throw new HttpsError("failed-precondition", "The final fare is not ready yet.");
+
+    // Two things a rider can owe: the fare for a trip they took, or the fee
+    // for cancelling one after the driver had set off. Both are server-written
+    // and both pay out to the same driver, so they share this flow.
+    const charge = billableCharge(ride);
+    if (!charge) {
+      throw new HttpsError(
+        "failed-precondition",
+        ride.status === "completed"
+          ? "The final fare is not ready yet."
+          : "There is nothing to pay on this ride."
+      );
     }
 
     const driver = ride.driverId
@@ -169,17 +203,17 @@ export const createRideCheckout = onCall(
         {
           quantity: 1,
           price_data: {
-            currency: fare.currency.toLowerCase(),
-            unit_amount: toMinorUnits(fare.total),
+            currency: charge.currency.toLowerCase(),
+            unit_amount: toMinorUnits(charge.amount),
             product_data: {
-              name: "Taxi fare",
+              name: charge.name,
               description: `${ride.pickup.address} → ${ride.dropoff.address}`,
             },
           },
         },
       ],
       payment_intent_data: {
-        application_fee_amount: toMinorUnits(fare.commission),
+        application_fee_amount: toMinorUnits(charge.commission),
         transfer_data: { destination: driver.stripeAccountId },
         metadata: { rideId, riderId: ride.riderId, driverId: ride.driverId ?? "" },
       },
@@ -193,8 +227,8 @@ export const createRideCheckout = onCall(
         status: "pending",
         provider: "stripe",
         checkoutSessionId: session.id,
-        amount: fare.total,
-        currency: fare.currency,
+        amount: charge.amount,
+        currency: charge.currency,
       },
     });
 

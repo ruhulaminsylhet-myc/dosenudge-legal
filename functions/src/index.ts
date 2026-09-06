@@ -26,6 +26,7 @@ import { sendPush, sendPushMulti } from "./notify.js";
 import {
   EXPIRING_DOCUMENTS,
   type ApprovalStatus,
+  type CancellationCharge,
   type DriverDoc,
   type LatLng,
   type RideDoc,
@@ -223,17 +224,22 @@ export const onRideUpdated = onDocumentUpdated("rides/{rideId}", async (event) =
       break;
     }
     case "cancelled": {
+      const charge = await chargeCancellation(rideId, before, after, ref);
       if (after.driverId) {
         const driverSnap = await db().doc(`drivers/${after.driverId}`).get();
         await sendPush((driverSnap.data() as DriverDoc | undefined)?.fcmToken, {
           title: "Ride cancelled",
-          body: "The ride was cancelled.",
+          body: charge
+            ? `The rider cancelled. You've been paid ${money(charge.currency, charge.driverPayout)} for the trip out.`
+            : "The ride was cancelled.",
           data: { type: "ride_cancelled", rideId },
         });
       }
       await sendPush(riderToken, {
         title: "Ride cancelled",
-        body: "Your ride has been cancelled.",
+        body: charge
+          ? `Your driver was already on the way, so a ${money(charge.currency, charge.amount)} cancellation fee applies.`
+          : "Your ride has been cancelled.",
         data: { type: "ride_cancelled", rideId },
       });
       await clearContactDetails(ref);
@@ -256,6 +262,73 @@ async function clearContactDetails(
     riderPhone: FieldValue.delete(),
     "driverInfo.phone": FieldValue.delete(),
   });
+}
+
+/** Amount with its ISO currency code, for push copy. */
+const money = (currency: string, amount: number): string =>
+  `${currency} ${amount.toFixed(2)}`;
+
+/**
+ * Charges a rider who cancels after the driver has already set off, and pays
+ * the driver for the wasted trip out. Without this the driver carries the cost
+ * of every late cancellation, and there is nothing to discourage one.
+ *
+ * Only rider cancellations are chargeable: a driver or admin cancelling is not
+ * the rider's fault, and a cancellation inside the grace period (or before
+ * anyone accepted) costs nothing. Returns the charge, or null if none applied.
+ */
+async function chargeCancellation(
+  rideId: string,
+  before: RideDoc,
+  after: RideDoc,
+  ref: FirebaseFirestore.DocumentReference
+): Promise<CancellationCharge | null> {
+  if (after.cancelledBy !== "rider") return null;
+  if (before.status !== "accepted" && before.status !== "arrived") return null;
+  if (!after.driverId) return null;
+
+  const pricing = await getPricing();
+  if (pricing.cancellationFee <= 0) return null;
+
+  const acceptedAt = after.acceptedAt?.toDate();
+  if (!acceptedAt) return null;
+  const afterSec = Math.round((Date.now() - acceptedAt.getTime()) / 1000);
+  if (afterSec < pricing.freeCancellationSec) return null;
+
+  const amount = round2(pricing.cancellationFee);
+  const commission = round2(amount * (pricing.commissionPct / 100));
+  const charge: CancellationCharge = {
+    currency: pricing.currency,
+    amount,
+    commission,
+    driverPayout: round2(amount - commission),
+    afterSec,
+  };
+
+  const driverRef = db().doc(`drivers/${after.driverId}`);
+  const earningsRef = db().collection("earnings").doc();
+
+  // The driver is credited now; the rider settles the fee from the app. The
+  // ledger entry carries no ride count — a cancellation isn't a completed trip.
+  await db().runTransaction(async (tx) => {
+    tx.update(ref, { cancellationCharge: charge });
+    tx.update(driverRef, {
+      totalEarnings: FieldValue.increment(charge.driverPayout),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(earningsRef, {
+      driverId: after.driverId,
+      rideId,
+      kind: "cancellation_fee",
+      currency: charge.currency,
+      grossFare: charge.amount,
+      commission: charge.commission,
+      netPayout: charge.driverPayout,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  });
+  logger.info("cancellation charged", { rideId, amount, afterSec });
+  return charge;
 }
 
 async function settleRide(

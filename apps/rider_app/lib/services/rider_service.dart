@@ -149,6 +149,14 @@ class RiderService {
       .doc('rides/$rideId')
       .update({'status': 'cancelled', 'cancelledBy': 'rider'});
 
+  /// Fare and dispatch settings, including the cancellation fee, so the app can
+  /// warn before a cancellation costs money. Read-only for riders (rules), and
+  /// the server recomputes any charge itself — this is only for the warning.
+  Future<PricingConfig> pricing() async {
+    final snap = await _db.doc('config/pricing').get();
+    return PricingConfig.fromMap(snap.data());
+  }
+
   /// Returns a Stripe Checkout URL for a completed, unpaid ride. The platform
   /// commission is taken as an application fee and the rest goes straight to
   /// the driver's connected account.

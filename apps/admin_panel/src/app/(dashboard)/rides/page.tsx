@@ -104,9 +104,20 @@ export default function RidesPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {fare ? `${fare.currency} ${fare.total.toFixed(2)}` : "—"}
-                    {r.finalFare && (
-                      <span className="ml-1 text-xs text-emerald-600">final</span>
+                    {r.cancellationCharge ? (
+                      <>
+                        {`${r.cancellationCharge.currency} ${r.cancellationCharge.amount.toFixed(2)}`}
+                        <span className="ml-1 text-xs text-amber-600">
+                          cancellation fee
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {fare ? `${fare.currency} ${fare.total.toFixed(2)}` : "—"}
+                        {r.finalFare && (
+                          <span className="ml-1 text-xs text-emerald-600">final</span>
+                        )}
+                      </>
                     )}
                   </td>
                   <td className="px-4 py-3">

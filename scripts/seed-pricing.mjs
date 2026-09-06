@@ -24,6 +24,8 @@ const PRESETS = {
     searchRadiusKm: 8,
     maxDriversNotified: 10,
     requestTimeoutSec: 120,
+    cancellationFee: 3.0,
+    freeCancellationSec: 120,
     maxRouteFactor: 2.5,
   },
   BDT: {
@@ -36,6 +38,8 @@ const PRESETS = {
     searchRadiusKm: 5,
     maxDriversNotified: 15,
     requestTimeoutSec: 120,
+    cancellationFee: 60,
+    freeCancellationSec: 120,
     maxRouteFactor: 2.5,
   },
 };

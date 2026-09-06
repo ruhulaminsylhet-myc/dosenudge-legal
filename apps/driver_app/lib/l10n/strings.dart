@@ -181,6 +181,10 @@ class Strings {
       _('Navigate to pickup', 'যাত্রীর কাছে পথ দেখান');
   String get navigateToDropoff =>
       _('Navigate to dropoff', 'গন্তব্যে পথ দেখান');
+  String get cancellationFeeEarned => _(
+        'Cancellation fee — the rider cancelled after you set off',
+        'বাতিলের ফি — আপনি রওনা দেওয়ার পর যাত্রী বাতিল করেছেন',
+      );
   String get cancelRide => _('Cancel ride', 'যাত্রা বাতিল করুন');
   String get cancelRideQuestion =>
       _('Cancel this ride?', 'যাত্রাটি বাতিল করবেন?');

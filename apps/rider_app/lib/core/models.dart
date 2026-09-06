@@ -57,6 +57,25 @@ class RidePayment {
   bool get isPaid => status == 'paid';
 }
 
+/// What a rider owes for cancelling after the driver had already set off.
+/// Written by the server; the app only ever displays and pays it.
+class CancellationCharge {
+  final String currency;
+  final double amount;
+
+  const CancellationCharge({required this.currency, required this.amount});
+
+  static CancellationCharge? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    return CancellationCharge(
+      currency: (m['currency'] ?? '') as String,
+      amount: ((m['amount'] ?? 0) as num).toDouble(),
+    );
+  }
+
+  String get label => '$currency ${amount.toStringAsFixed(2)}';
+}
+
 class Ride {
   final String id;
   final String riderId;
@@ -68,9 +87,12 @@ class Ride {
   final Fare? fareEstimate;
   final Fare? finalFare;
   final Timestamp? requestedAt;
+  /// When a driver took the ride — the clock the free-cancellation window runs on.
+  final Timestamp? acceptedAt;
   final int? rating;
   final DriverInfo? driverInfo;
   final RidePayment? payment;
+  final CancellationCharge? cancellationCharge;
 
   const Ride({
     required this.id,
@@ -83,9 +105,11 @@ class Ride {
     required this.fareEstimate,
     required this.finalFare,
     required this.requestedAt,
+    required this.acceptedAt,
     required this.rating,
     required this.driverInfo,
     required this.payment,
+    required this.cancellationCharge,
   });
 
   factory Ride.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -102,9 +126,12 @@ class Ride {
       fareEstimate: Fare.fromMap(d['fareEstimate'] as Map<String, dynamic>?),
       finalFare: Fare.fromMap(d['finalFare'] as Map<String, dynamic>?),
       requestedAt: d['requestedAt'] as Timestamp?,
+      acceptedAt: d['acceptedAt'] as Timestamp?,
       rating: (d['rating'] as num?)?.toInt(),
       driverInfo: DriverInfo.fromMap(d['driverInfo'] as Map<String, dynamic>?),
       payment: RidePayment.fromMap(d['payment'] as Map<String, dynamic>?),
+      cancellationCharge: CancellationCharge.fromMap(
+          d['cancellationCharge'] as Map<String, dynamic>?),
     );
   }
 
@@ -144,4 +171,31 @@ class DriverInfo {
       phone: m['phone'] as String?,
     );
   }
+}
+
+/// The pricing and dispatch settings the operator edits in the admin panel.
+/// The app reads only what it needs to explain a charge before it happens —
+/// every actual amount is computed server-side.
+class PricingConfig {
+  final String currency;
+  final double cancellationFee;
+  final int freeCancellationSec;
+
+  const PricingConfig({
+    required this.currency,
+    required this.cancellationFee,
+    required this.freeCancellationSec,
+  });
+
+  factory PricingConfig.fromMap(Map<String, dynamic>? m) => PricingConfig(
+        currency: (m?['currency'] ?? 'GBP') as String,
+        cancellationFee: ((m?['cancellationFee'] ?? 0) as num).toDouble(),
+        freeCancellationSec:
+            ((m?['freeCancellationSec'] ?? 0) as num).toInt(),
+      );
+
+  bool get chargesForCancellation => cancellationFee > 0;
+
+  String get cancellationFeeLabel =>
+      '$currency ${cancellationFee.toStringAsFixed(2)}';
 }

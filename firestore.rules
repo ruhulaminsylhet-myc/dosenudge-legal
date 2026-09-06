@@ -120,10 +120,15 @@ service cloud.firestore {
             && resource.data.status == 'in_progress'
             && request.resource.data.meteredDistanceKm is number
             && request.resource.data.meteredDistanceKm >= resource.data.get('meteredDistanceKm', 0))
-        // Assigned driver advances the trip.
+        // Assigned driver advances the trip. Each party may only ever stamp
+        // their own name on a cancellation: cancelledBy decides who pays the
+        // late-cancellation fee, so a rider writing 'driver' (or the reverse)
+        // would be moving money by editing one string.
         || (signedIn()
             && changes(['status', 'cancelledBy'])
             && resource.data.driverId == request.auth.uid
+            && (request.resource.data.status != 'cancelled'
+                || request.resource.data.cancelledBy == 'driver')
             && ((resource.data.status == 'accepted' && request.resource.data.status in ['arrived', 'cancelled'])
               || (resource.data.status == 'arrived' && request.resource.data.status == 'in_progress')
               || (resource.data.status == 'in_progress' && request.resource.data.status == 'completed')))
@@ -132,7 +137,8 @@ service cloud.firestore {
             && changes(['status', 'cancelledBy'])
             && resource.data.riderId == request.auth.uid
             && resource.data.status in ['requested', 'accepted', 'arrived']
-            && request.resource.data.status == 'cancelled');
+            && request.resource.data.status == 'cancelled'
+            && request.resource.data.cancelledBy == 'rider');
 
       allow delete: if isAdmin();
     }

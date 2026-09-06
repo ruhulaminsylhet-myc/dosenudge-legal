@@ -251,7 +251,38 @@ describe("ride status machine", () => {
 
   test("the rider can cancel before pickup", async () => {
     await assertSucceeds(
-      updateDoc(doc(rider(), "rides", "openRide"), { status: "cancelled" })
+      updateDoc(doc(rider(), "rides", "openRide"), {
+        status: "cancelled",
+        cancelledBy: "rider",
+      })
+    );
+  });
+
+  test("the rider cannot blame the driver to dodge the cancellation fee", async () => {
+    await assertFails(
+      updateDoc(doc(rider(), "rides", "openRide"), {
+        status: "cancelled",
+        cancelledBy: "driver",
+      })
+    );
+  });
+
+  test("a driver cannot blame the rider to earn a cancellation fee", async () => {
+    await assertFails(
+      updateDoc(doc(driver(NEAR_DRIVER), "rides", "openRide"), {
+        status: "cancelled",
+        cancelledBy: "rider",
+      })
+    );
+  });
+
+  test("the rider cannot write their own cancellation charge", async () => {
+    await assertFails(
+      updateDoc(doc(rider(), "rides", "openRide"), {
+        status: "cancelled",
+        cancelledBy: "rider",
+        cancellationCharge: { currency: "GBP", amount: 0, commission: 0, driverPayout: 0 },
+      })
     );
   });
 
@@ -346,6 +377,7 @@ describe("ride status machine", () => {
     await assertFails(
       updateDoc(doc(rider(), "rides", "openRide"), {
         status: "cancelled",
+        cancelledBy: "rider",
         offeredTo: [FAR_DRIVER],
       })
     );

@@ -119,6 +119,8 @@ export interface RideDoc {
   startedAt?: Timestamp;
   completedAt?: Timestamp;
   cancelledBy?: "rider" | "driver" | "system" | "admin";
+  /** Written by the server when a late rider cancellation is chargeable. */
+  cancellationCharge?: CancellationCharge;
   rating?: number;
   /** Set once the rider starts checkout; only the webhook marks it paid. */
   payment?: RidePayment;
@@ -137,6 +139,19 @@ export interface RideDoc {
   riderPhone?: string;
 }
 
+/**
+ * A late-cancellation fee. Shaped like a mini Fare so the checkout and the
+ * earnings ledger can treat it the same way as a completed trip.
+ */
+export interface CancellationCharge {
+  currency: string;
+  amount: number;
+  commission: number;
+  driverPayout: number;
+  /** Seconds between the driver accepting and the rider cancelling. */
+  afterSec: number;
+}
+
 export interface PricingConfig {
   currency: string; // ISO 4217, e.g. "GBP" — never hardcoded in app code
   baseFare: number;
@@ -147,6 +162,17 @@ export interface PricingConfig {
   searchRadiusKm: number;
   maxDriversNotified: number;
   requestTimeoutSec: number;
+  /**
+   * Charged to a rider who cancels after a driver has already set off, and
+   * passed to that driver (minus commission) as compensation. 0 disables it.
+   */
+  cancellationFee: number;
+  /**
+   * Grace period after a driver accepts, in seconds, during which cancelling
+   * is free. Long enough for an accidental request; short enough that the
+   * driver isn't halfway there.
+   */
+  freeCancellationSec: number;
   /**
    * Ceiling on billable distance as a multiple of the straight-line pickup →
    * dropoff distance. The driver's app reports the metered distance, so this
@@ -166,5 +192,7 @@ export const DEFAULT_PRICING: PricingConfig = {
   searchRadiusKm: 8,
   maxDriversNotified: 10,
   requestTimeoutSec: 120,
+  cancellationFee: 3.0,
+  freeCancellationSec: 120,
   maxRouteFactor: 2.5,
 };

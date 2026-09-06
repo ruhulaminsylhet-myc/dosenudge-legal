@@ -115,6 +115,24 @@ Duration আসল (trip start → complete)। Settlement একটা Firestor
 **transaction** এ হয়: ride এ finalFare + billedDistanceKm + driver totals
 increment + ledger entry — সব একসাথে, কখনো আধা-হওয়া state থাকবে না।
 
+### Late cancellation fee
+
+Driver রওনা দেওয়ার পর rider বাতিল করলে driver-এর সময় আর তেল দুটোই নষ্ট হয়।
+তাই `cancellationFee` (default £3, admin panel-এ editable, `0` দিলে বন্ধ):
+
+- শুধু **rider** cancel করলে (`cancelledBy == 'rider'`), আর আগের status
+  `accepted` বা `arrived` হলে।
+- accept-এর পর `freeCancellationSec` (default ১২০ সেকেন্ড) পর্যন্ত **ফ্রি** —
+  ভুল করে request দিলে শাস্তি হবে না।
+- Fee-তে একই `commissionPct` কাটে; বাকিটা driver-এর earnings ledger-এ
+  `kind: 'cancellation_fee'` হিসেবে জমা হয় (`totalRides` বাড়ে না — trip তো
+  হয়নি)। Rider app-এ Stripe Checkout দিয়েই fee টা দেওয়া যায়।
+
+Rider app cancel চাপার **আগে** জানিয়ে দেয় ফি লাগবে কি না, তাই surprise charge
+নেই। আর rules-এ প্রতিটা পক্ষ শুধু **নিজের নাম** cancelledBy-তে লিখতে পারে —
+না হলে rider `cancelledBy: 'driver'` লিখে ফি ফাঁকি দিত, বা driver
+`'rider'` লিখে নিজেই ফি বানিয়ে নিত (দুটোরই test আছে)।
+
 ## 6. Ratings ও driver documents
 
 **Rating:** trip complete হওয়ার পর rider app-এ star rating card আসে। কিন্তু rating

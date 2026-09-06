@@ -268,6 +268,8 @@ class Ride {
 
 class EarningsEntry {
   final String id;
+  /// 'cancellation_fee' for a late rider cancellation; absent for a trip.
+  final String? kind;
   final String currency;
   final double grossFare;
   final double commission;
@@ -276,6 +278,7 @@ class EarningsEntry {
 
   const EarningsEntry({
     required this.id,
+    required this.kind,
     required this.currency,
     required this.grossFare,
     required this.commission,
@@ -287,6 +290,7 @@ class EarningsEntry {
     final d = doc.data() ?? {};
     return EarningsEntry(
       id: doc.id,
+      kind: d['kind'] as String?,
       currency: (d['currency'] ?? '') as String,
       grossFare: ((d['grossFare'] ?? 0) as num).toDouble(),
       commission: ((d['commission'] ?? 0) as num).toDouble(),
@@ -294,4 +298,6 @@ class EarningsEntry {
       createdAt: d['createdAt'] as Timestamp?,
     );
   }
+
+  bool get isCancellationFee => kind == 'cancellation_fee';
 }

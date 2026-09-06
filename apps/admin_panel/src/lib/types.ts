@@ -102,6 +102,15 @@ export interface RideDoc {
   finalFare: Fare | null;
   requestedAt?: Timestamp;
   payment?: RidePayment;
+  /** Set when a rider cancelled late enough to be charged for it. */
+  cancellationCharge?: CancellationCharge;
+}
+
+export interface CancellationCharge {
+  currency: string;
+  amount: number;
+  commission: number;
+  driverPayout: number;
 }
 
 export interface PricingConfig {
@@ -114,5 +123,9 @@ export interface PricingConfig {
   searchRadiusKm: number;
   maxDriversNotified: number;
   requestTimeoutSec: number;
+  /** Charged to a rider who cancels after the driver set off; 0 disables it. */
+  cancellationFee: number;
+  /** Seconds after acceptance during which cancelling is free. */
+  freeCancellationSec: number;
   maxRouteFactor: number;
 }

@@ -173,6 +173,8 @@ const PRICING = {
   searchRadiusKm: 8,
   maxDriversNotified: 10,
   requestTimeoutSec: 120,
+  cancellationFee: 3.0,
+  freeCancellationSec: 120,
   maxRouteFactor: 2.5,
 };
 

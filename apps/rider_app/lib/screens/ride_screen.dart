@@ -103,19 +103,14 @@ class RideScreen extends StatelessWidget {
                   _PaymentCard(ride: ride),
                   _RatingCard(ride: ride),
                 ],
+                if (ride.status == 'cancelled' &&
+                    ride.cancellationCharge != null)
+                  _PaymentCard(ride: ride),
                 const Spacer(),
                 if (ride.status == 'requested' ||
                     ride.status == 'accepted' ||
                     ride.status == 'arrived')
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red),
-                    onPressed: () async {
-                      await RiderService.instance.cancelRide(ride.id);
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
-                    child: Text(t.cancelRide),
-                  ),
+                  _CancelButton(ride: ride),
                 if (!ride.isOpen)
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(),
@@ -126,6 +121,79 @@ class RideScreen extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+
+/// Cancelling is free until a driver has been on the way for a while, and the
+/// rider should know which side of that line they are on before they tap — the
+/// server charges the fee either way, so a surprise here is a complaint later.
+class _CancelButton extends StatefulWidget {
+  const _CancelButton({required this.ride});
+
+  final Ride ride;
+
+  @override
+  State<_CancelButton> createState() => _CancelButtonState();
+}
+
+class _CancelButtonState extends State<_CancelButton> {
+  bool _busy = false;
+
+  /// True once the driver has been travelling longer than the free window.
+  Future<bool> _isChargeable(PricingConfig pricing) async {
+    if (!pricing.chargesForCancellation) return false;
+    if (widget.ride.status == 'requested') return false;
+    final acceptedAt = widget.ride.acceptedAt?.toDate();
+    if (acceptedAt == null) return false;
+    return DateTime.now().difference(acceptedAt).inSeconds >=
+        pricing.freeCancellationSec;
+  }
+
+  Future<void> _confirmAndCancel() async {
+    final t = Strings.of(context);
+    setState(() => _busy = true);
+    try {
+      final pricing = await RiderService.instance.pricing();
+      final chargeable = await _isChargeable(pricing);
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(t.cancelRideQuestion),
+              content: Text(chargeable
+                  ? t.cancelFeeWarning(pricing.cancellationFeeLabel)
+                  : t.cancelFree),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(t.keepRide),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text(t.cancelRide),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!confirmed) return;
+      await RiderService.instance.cancelRide(widget.ride.id);
+      if (mounted) Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Strings.of(context);
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+      onPressed: _busy ? null : _confirmAndCancel,
+      child: Text(t.cancelRide),
     );
   }
 }
@@ -185,7 +253,11 @@ class _PaymentCardState extends State<_PaymentCard> {
       );
     }
 
-    final fare = widget.ride.finalFare;
+    // Either a finished trip's fare or a late-cancellation fee — the server
+    // decides which is owed, and checkout bills whichever it wrote.
+    final charge = widget.ride.cancellationCharge;
+    final isCancellation = charge != null;
+    final amountLabel = isCancellation ? charge.label : widget.ride.finalFare?.label;
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
@@ -193,10 +265,15 @@ class _PaymentCardState extends State<_PaymentCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.payYourFare, style: Theme.of(context).textTheme.titleMedium),
+            Text(isCancellation ? t.cancellationFee : t.payYourFare,
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              payment?.status == 'failed' ? t.paymentFailed : t.payByCardOrCash,
+              payment?.status == 'failed'
+                  ? t.paymentFailed
+                  : (isCancellation
+                      ? t.cancellationFeeExplained
+                      : t.payByCardOrCash),
               style: TextStyle(color: Colors.grey.shade600),
             ),
             if (_error != null) ...[
@@ -208,7 +285,7 @@ class _PaymentCardState extends State<_PaymentCard> {
               width: double.infinity,
               child: FilledButton.icon(
                 icon: const Icon(Icons.credit_card),
-                label: Text(_busy ? t.opening : t.payByCard(fare?.label ?? '')),
+                label: Text(_busy ? t.opening : t.payByCard(amountLabel ?? '')),
                 onPressed: _busy ? null : _pay,
               ),
             ),

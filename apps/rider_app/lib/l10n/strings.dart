@@ -79,6 +79,24 @@ class Strings {
   String get done => _('Done', 'সম্পন্ন');
 
   // Payment
+  String get cancelRideQuestion =>
+      _('Cancel this ride?', 'এই যাত্রা বাতিল করবেন?');
+  String get keepRide => _('Keep ride', 'যাত্রা রাখুন');
+  String get cancelFree => _(
+        'You can cancel this one free of charge.',
+        'এই যাত্রাটি বিনা খরচে বাতিল করতে পারবেন।',
+      );
+  String cancelFeeWarning(String fee) => _(
+        'Your driver is already on the way, so cancelling now costs $fee.',
+        'আপনার ড্রাইভার ইতিমধ্যেই রওনা দিয়েছেন, তাই এখন বাতিল করলে $fee লাগবে।',
+      );
+  String get cancellationFee => _('Cancellation fee', 'বাতিলের ফি');
+  String get cancellationFeeExplained => _(
+        'Your driver had already set off, so this fee goes to them for the '
+            'journey out.',
+        'ড্রাইভার আগেই রওনা দিয়েছিলেন, তাই এই ফি তাঁর যাতায়াতের জন্য '
+            'তাঁকেই দেওয়া হয়।',
+      );
   String get payYourFare => _('Pay your fare', 'ভাড়া পরিশোধ করুন');
   String get payByCardOrCash => _(
         'Pay securely by card, or settle in cash with your driver.',

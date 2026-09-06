@@ -15,7 +15,9 @@ A complete three-tier ride-hailing MVP:
 ## What the platform does
 
 - **Riders** register, get a fare estimate, request a taxi, track status live,
-  rate the driver afterwards, and see their history.
+  rate the driver afterwards, and see their history. Cancelling is free for the
+  first two minutes after a driver accepts; after that the app says what the
+  fee will be before they confirm.
 - **Drivers** apply with vehicle details, upload verification documents
   (licence, insurance, vehicle photo — with the expiry date on the first two),
   wait for admin approval, go online
@@ -31,7 +33,9 @@ A complete three-tier ride-hailing MVP:
 - **Server** matches each request to the nearest online approved drivers
   (geohash radius query), computes fares from `config/pricing`, settles
   completed trips into an earnings ledger, sends all push notifications, and
-  expires unanswered requests. It also sweeps driver paperwork daily: licences
+  expires unanswered requests, and charges late cancellations — the fee goes to
+  the driver who had already set off, minus the usual commission. It also
+  sweeps driver paperwork daily: licences
   and insurance get renewal reminders at 30/14/7/3/1 days, and a driver whose
   document actually lapses is taken offline until an admin approves the
   replacement — nobody dispatches a rider into an uninsured car.
@@ -159,7 +163,7 @@ click through the whole operator flow before touching a real project.
 ## Tests
 
 Security rules are the main thing standing between a driver and someone else's
-data, so they have their own suite (41 assertions) that runs against the
+data, so they have their own suite (44 assertions) that runs against the
 Firestore emulator — no project or credentials needed:
 
 ```bash
@@ -170,8 +174,8 @@ cd tests && npm install && npm test
 It covers who may read driver profiles and open ride requests, every legal and
 illegal ride-status transition, which fields a client may write on a ride, the
 earnings ledger being server-only, self-promotion to admin, drivers enabling
-their own Stripe payouts, and drivers clearing their own expired-document
-block. CI runs it on every push.
+their own Stripe payouts, drivers clearing their own expired-document block,
+and either party blaming the other for a cancellation to move the fee. CI runs it on every push.
 
 ## Monthly cost estimate (MVP scale, ~1k rides/month)
 
