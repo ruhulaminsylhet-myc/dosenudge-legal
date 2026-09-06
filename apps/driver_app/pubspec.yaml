@@ -1,0 +1,31 @@
+name: taxi_driver_app
+description: Driver app for the taxi platform (Flutter + Firebase).
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.3.0
+  cloud_firestore: ^5.5.0
+  cloud_functions: ^5.1.0
+  firebase_messaging: ^15.1.0
+  firebase_storage: ^12.3.0
+  geolocator: ^13.0.0
+  image_picker: ^1.1.0
+  url_launcher: ^6.3.0
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

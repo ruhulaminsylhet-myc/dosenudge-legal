@@ -1,0 +1,164 @@
+rules_version = '2';
+
+// RBAC model:
+//  - Custom claims set server-side by Cloud Functions: { admin: true } and { role: 'driver' | 'rider' }
+//  - Clients can never grant themselves a role; all privileged transitions go through callable functions.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isDriver() {
+      return signedIn() && request.auth.token.role == 'driver';
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+
+      // Self-registration: role must be rider or driver, status starts 'active',
+      // and the client can never write privileged fields.
+      allow create: if isSelf(uid)
+        && request.resource.data.role in ['rider', 'driver']
+        && request.resource.data.status == 'active';
+
+      // Self-update: cannot change own role or status (admin-only levers).
+      allow update: if (isSelf(uid)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status)
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- drivers ----------
+    match /drivers/{uid} {
+      // Drivers see only their own profile. Riders never read this collection:
+      // the name/vehicle/rating they need is denormalised onto the ride doc by
+      // onRideUpdated, so phone numbers and live locations stay private.
+      allow read: if isSelf(uid) || isAdmin();
+
+      // Driver creates own profile; approval always starts 'pending'.
+      allow create: if isSelf(uid)
+        && request.resource.data.approvalStatus == 'pending';
+
+      // Driver may update own doc but can never touch approvalStatus, rating,
+      // lifetime counters, the expired-documents block, or their Stripe payout
+      // state — a driver who could set payoutsEnabled would collect card
+      // payments without Stripe ever having verified them, and one who could
+      // clear expiryBlocked would hide their own lapsed insurance.
+      allow update: if (isSelf(uid)
+          && request.resource.data.approvalStatus == resource.data.approvalStatus
+          && request.resource.data.get('expiryBlocked', false) == resource.data.get('expiryBlocked', false)
+          && request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
+          && request.resource.data.get('totalRides', 0) == resource.data.get('totalRides', 0)
+          && request.resource.data.get('totalEarnings', 0) == resource.data.get('totalEarnings', 0)
+          && request.resource.data.get('payoutsEnabled', false) == resource.data.get('payoutsEnabled', false)
+          && request.resource.data.get('stripeAccountId', '') == resource.data.get('stripeAccountId', ''))
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- rides ----------
+    match /rides/{rideId} {
+      function isParticipant() {
+        return signedIn()
+          && (resource.data.riderId == request.auth.uid
+              || resource.data.driverId == request.auth.uid);
+      }
+
+      allow read: if isParticipant() || isAdmin()
+        // A driver sees an open request only if dispatch actually offered it to
+        // them — otherwise every driver could read every rider's addresses.
+        || (isDriver()
+            && resource.data.status == 'requested'
+            && request.auth.uid in resource.data.offeredTo);
+
+      // Rider creates a ride request for themself, always starting at 'requested'.
+      allow create: if signedIn()
+        && request.resource.data.riderId == request.auth.uid
+        && request.resource.data.status == 'requested'
+        && request.resource.data.driverId == null;
+
+      // Which fields a client may touch at all. Everything else on a ride —
+      // fares, distance, offeredTo, driverInfo, rating, timestamps — is written
+      // only by Cloud Functions. Without this the assigned driver could inflate
+      // estimatedDistanceKm (settlement prices the trip from it) or pre-set
+      // rating to block the rider's review.
+      function changes(allowed) {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+      }
+
+      // Allowed client-side transitions; everything else (fares, earnings,
+      // notifications) is enforced by Cloud Functions triggers.
+      allow update: if isAdmin()
+        // Driver claims an open request (atomic: only if still unassigned).
+        || (isDriver()
+            && changes(['status', 'driverId'])
+            && resource.data.status == 'requested'
+            && request.auth.uid in resource.data.offeredTo
+            && resource.data.driverId == null
+            && request.resource.data.driverId == request.auth.uid
+            && request.resource.data.status == 'accepted')
+        // Assigned driver's app reports how far the trip has actually gone.
+        // Only ever upwards, only mid-trip, and settlement still clamps the
+        // value against the straight-line distance before charging anyone.
+        || (signedIn()
+            && changes(['meteredDistanceKm'])
+            && resource.data.driverId == request.auth.uid
+            && resource.data.status == 'in_progress'
+            && request.resource.data.meteredDistanceKm is number
+            && request.resource.data.meteredDistanceKm >= resource.data.get('meteredDistanceKm', 0))
+        // Assigned driver advances the trip. Each party may only ever stamp
+        // their own name on a cancellation: cancelledBy decides who pays the
+        // late-cancellation fee, so a rider writing 'driver' (or the reverse)
+        // would be moving money by editing one string.
+        || (signedIn()
+            && changes(['status', 'cancelledBy'])
+            && resource.data.driverId == request.auth.uid
+            && (request.resource.data.status != 'cancelled'
+                || request.resource.data.cancelledBy == 'driver')
+            && ((resource.data.status == 'accepted' && request.resource.data.status in ['arrived', 'cancelled'])
+              || (resource.data.status == 'arrived' && request.resource.data.status == 'in_progress')
+              || (resource.data.status == 'in_progress' && request.resource.data.status == 'completed')))
+        // Rider cancels before pickup.
+        || (signedIn()
+            && changes(['status', 'cancelledBy'])
+            && resource.data.riderId == request.auth.uid
+            && resource.data.status in ['requested', 'accepted', 'arrived']
+            && request.resource.data.status == 'cancelled'
+            && request.resource.data.cancelledBy == 'rider');
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- earnings ledger (server-written only) ----------
+    match /earnings/{entryId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.driverId == request.auth.uid);
+      allow write: if false; // Cloud Functions (Admin SDK) only
+    }
+
+    // ---------- platform config (pricing etc.) ----------
+    match /config/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Default deny.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

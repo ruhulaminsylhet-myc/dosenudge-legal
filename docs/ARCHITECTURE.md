@@ -1,0 +1,251 @@
+# Architecture — Taxi Platform
+
+এই document টা পুরো system এর ভেতরের কাজ ব্যাখ্যা করে — data model, ride lifecycle,
+security (RBAC), আর dispatch engine কীভাবে কাজ করে। Code সব English এ, ব্যাখ্যা
+Bangla + English mix এ।
+
+## 1. High-level flow
+
+```
+Rider App ──create──▶ rides/{id} (status: requested)
+                          │ Firestore trigger
+                          ▼
+              onRideCreated (Cloud Function)
+              · fare estimate লিখে দেয়
+              · geohash query দিয়ে কাছের online approved drivers খুঁজে
+              · তাদের FCM push পাঠায়
+                          │
+Driver App ──accept──▶ status: accepted  (transaction — একজনই পাবে)
+Driver App ──────────▶ arrived → in_progress → completed
+                          │ Firestore trigger
+                          ▼
+              onRideUpdated (Cloud Function)
+              · প্রতি step এ rider কে push notification
+              · completed হলে: final fare, commission কেটে
+                earnings ledger entry + driver totals update
+```
+
+## 2. Data model (Firestore)
+
+| Collection | Purpose | কে লিখতে পারে |
+|---|---|---|
+| `users/{uid}` | সব user এর profile + role (`rider`/`driver`/`admin`) + status | নিজে (role/status বাদে), admin |
+| `drivers/{uid}` | Driver application: vehicle, approvalStatus, isOnline, location+geohash, rating, totals | Driver নিজে (approval/rating/totals বাদে), admin |
+| `rides/{id}` | পুরো ride lifecycle | Rider (create/cancel), driver (claim/progress), admin |
+| `earnings/{id}` | Settlement ledger — trip-by-trip payout record | **শুধু Cloud Functions** |
+| `config/pricing` | Fare rates, commission %, dispatch settings | শুধু admin |
+
+Ride statuses: `requested → accepted → arrived → in_progress → completed`,
+plus `cancelled` (rider/driver/admin/system) আর `expired` (timeout এ কেউ নেয়নি)।
+
+## 3. Security model (RBAC) — সবচেয়ে গুরুত্বপূর্ণ অংশ
+
+**তিন স্তরের defence:**
+
+1. **Custom claims** — `role: driver|rider` set হয় server-side এ
+   (`onUserCreated` trigger), আর `admin: true` শুধু bootstrap script বা
+   অন্য admin এর `adminGrantAdmin` call দিয়ে। Client কখনো নিজের claim
+   লিখতে পারে না।
+2. **Firestore rules** — প্রতিটা sensitive field level এ enforce করা:
+   - driver নিজের `approvalStatus`, `rating`, `totalEarnings` change করতে পারে না
+   - ride এর status transition গুলো rules এ hard-coded (যেমন `accepted`
+     থেকে শুধু `arrived`/`cancelled` এ যাওয়া যায়)
+   - ride claim atomic: `driverId == null && status == 'requested'` হলেই কেবল নেওয়া যায়
+   - `earnings` client-side write সম্পূর্ণ বন্ধ
+3. **Cloud Functions (Admin SDK)** — privileged operations (approve, suspend,
+   settle) শুধু এখান দিয়েই হয়। Suspend করলে Firebase Auth account **disable**
+   + refresh token revoke হয়, তাই user সব device থেকে সাথে সাথে bad হয়ে যায়।
+
+**Data minimisation (UK GDPR):** কেউ প্রয়োজনের বেশি data পড়তে পারে না —
+- `drivers` collection-এ driver-এর phone আর live location আছে, তাই সেটা শুধু
+  **নিজে + admin** পড়তে পারে। Rider-কে যা দেখাতে হয় (নাম, গাড়ি, rating) সেটা
+  accept-এর সময় function ride doc-এর `driverInfo` field-এ copy করে দেয়।
+- একটা open ride request শুধু **যে driver দের offer করা হয়েছে** (`offeredTo`
+  array) তারাই পড়তে ও accept করতে পারে। তাই London-এর driver Manchester-এর
+  rider-এর address কখনো দেখবে না — rules আর app query দুই জায়গাতেই enforce করা।
+- **ফোন নম্বর শুধু যাত্রা চলাকালীন।** Accept হলে দুই পক্ষের নম্বর ride doc-এ
+  copy হয় (driver pickup-এ পৌঁছে rider-কে ফোন করতে পারতে হবে), আর যাত্রা
+  শেষ/বাতিল হলে function সেগুলো **মুছে দেয়**। তাই পুরনো ride history-তে কারো
+  নম্বর জমে থাকে না — যতটুকু সময় দরকার ততটুকুই থাকে।
+
+## 4. Dispatch engine (driver matching)
+
+- Driver online হলে app প্রতি ~25 metre এ `drivers/{uid}` doc এ
+  `GeoPoint` + **geohash** লেখে (Dart এ ছোট geohash encoder আছে —
+  `apps/driver_app/lib/core/geohash.dart` — এটা `geofire-common` এর
+  encoding এর সাথে compatible)।
+- `onRideCreated` function `geofire-common` এর `geohashQueryBounds` দিয়ে
+  pickup point এর চারপাশে radius query চালায় (default 8 km,
+  `config/pricing.searchRadiusKm` থেকে আসে), distance sort করে nearest
+  N (default 10) driver কে FCM push পাঠায়।
+- Driver দের in-app live list ও আছে (`status == 'requested'` stream), তাই
+  push miss হলেও request দেখা যায়।
+- ২ মিনিটে (configurable) কেউ না নিলে scheduled function `expired` করে দেয়।
+
+**Scaling note:** এক city-scale MVP তে এটা যথেষ্ট। বড় scale এ পরে driver
+location কে আলাদা `driver_locations` collection বা Redis geo-index এ সরানো যাবে —
+write hot-spot আলাদা হয়ে যায়, `drivers` doc টা তখন profile-only থাকে।
+
+## 5. Fare & settlement
+
+সব rates `config/pricing` এ (admin panel → Pricing) — **কোনো currency বা rate
+code এ hardcode নেই**, তাই UK (GBP) বা BD (BDT) দুটোই শুধু config change:
+
+```
+total = max(baseFare + perKm·distance + perMin·duration, minimumFare)
+commission = total × commissionPct%          → platform এর আয়
+driverPayout = total − commission            → earnings ledger এ জমা হয়
+```
+
+**Distance কোথা থেকে আসে:** ride request-এর সময় দেখানো estimate টা haversine ×
+1.3 (শুধু rider-কে আগে থেকে ধারণা দেওয়ার জন্য)। কিন্তু **আসল বিল হয় driver-এর
+app যে দূরত্ব মেপেছে সেটায়** — trip `in_progress` থাকাকালীন GPS fix গুলোর মধ্যে
+দূরত্ব যোগ হতে থাকে (প্রতি 200 m-এ একবার Firestore-এ লেখা হয়, cumulative value,
+তাই একটা write miss হলেও পরেরটায় ঠিক হয়ে যায়)।
+
+Reading টা driver-এর device থেকে আসে, তাই settlement-এ **clamp** করা হয়:
+```
+billableKm = clamp(meteredKm, straightLineKm, straightLineKm × maxRouteFactor)
+```
+`maxRouteFactor` default 2.5 (admin panel-এ বদলানো যায়) — one-way system বা
+diversion-এর জন্য যথেষ্ট, কিন্তু কেউ মিটার ফুলিয়ে rider-কে ঠকাতে পারবে না।
+Rules-এও metered value শুধু **বাড়ানো** যায়, শুধু নিজের চলমান trip-এ (test করা)।
+
+Duration আসল (trip start → complete)। Settlement একটা Firestore
+**transaction** এ হয়: ride এ finalFare + billedDistanceKm + driver totals
+increment + ledger entry — সব একসাথে, কখনো আধা-হওয়া state থাকবে না।
+
+### Late cancellation fee
+
+Driver রওনা দেওয়ার পর rider বাতিল করলে driver-এর সময় আর তেল দুটোই নষ্ট হয়।
+তাই `cancellationFee` (default £3, admin panel-এ editable, `0` দিলে বন্ধ):
+
+- শুধু **rider** cancel করলে (`cancelledBy == 'rider'`), আর আগের status
+  `accepted` বা `arrived` হলে।
+- accept-এর পর `freeCancellationSec` (default ১২০ সেকেন্ড) পর্যন্ত **ফ্রি** —
+  ভুল করে request দিলে শাস্তি হবে না।
+- Fee-তে একই `commissionPct` কাটে; বাকিটা driver-এর earnings ledger-এ
+  `kind: 'cancellation_fee'` হিসেবে জমা হয় (`totalRides` বাড়ে না — trip তো
+  হয়নি)। Rider app-এ Stripe Checkout দিয়েই fee টা দেওয়া যায়।
+
+Rider app cancel চাপার **আগে** জানিয়ে দেয় ফি লাগবে কি না, তাই surprise charge
+নেই। আর rules-এ প্রতিটা পক্ষ শুধু **নিজের নাম** cancelledBy-তে লিখতে পারে —
+না হলে rider `cancelledBy: 'driver'` লিখে ফি ফাঁকি দিত, বা driver
+`'rider'` লিখে নিজেই ফি বানিয়ে নিত (দুটোরই test আছে)।
+
+## 6. Ratings ও driver documents
+
+**Rating:** trip complete হওয়ার পর rider app-এ star rating card আসে। কিন্তু rating
+সরাসরি Firestore-এ লেখা হয় **না** — rules-এ `drivers.rating` client-write বন্ধ।
+Rider `rateRide` callable ডাকে, সেটা একটা transaction-এ:
+1. check করে ride টা এই rider-এরই, `completed`, আর আগে rate করা হয়নি
+2. stored `rating × ratingCount` থেকে নতুন average বের করে (client যা পাঠাল
+   তা বিশ্বাস না করে) — দুইজন একসাথে rate করলেও value drift করবে না
+
+**Documents:** driver approval-এর আগে licence, insurance আর vehicle photo upload
+করতে হয় → Firebase Storage-এ `driver_docs/{uid}/` path-এ (storage rules: শুধু
+নিজে + admin পড়তে পারে, ১০ MB limit, image/PDF only)। URL গুলো driver doc-এর
+`documents` map-এ জমা হয়, আর admin panel-এর Drivers table-এ clickable link
+হিসেবে দেখায় — approve চাপার আগে admin যাচাই করে নিতে পারে।
+
+প্রতিটা entry এখন `{ url, expiresAt }` — `expiresAt` হলো ISO `yyyy-mm-dd`:
+
+```ts
+documents: {
+  licence:      { url: "…", expiresAt: "2027-03-14" },
+  insurance:    { url: "…", expiresAt: "2026-11-02" },
+  vehiclePhoto: { url: "…" },   // ছবির মেয়াদ নেই
+}
+```
+
+**Expiry enforcement:** UK-তে মেয়াদোত্তীর্ণ licence/insurance নিয়ে গাড়ি চালানো
+বেআইনি, আর platform সেই driver-কে কাজ দিলে দায় তোমার উপরেও পড়ে। তাই
+`checkDocumentExpiry` scheduled function রোজ ভোর ৬টায় চলে
+(`EXPIRING_DOCUMENTS = ['licence', 'insurance']`):
+
+- **মেয়াদ শেষ** → driver `approvalStatus: 'pending'` + `isOnline: false` +
+  `expiryBlocked: true`, সাথে push। `pending` মানে dispatch আর তাকে ride
+  offer করবে না — নতুন কাগজ upload করে admin re-approve না করা পর্যন্ত।
+- **৩০ / ১৪ / ৭ / ৩ / ১ দিন বাকি** → warning push, দিনে একবারই
+  (`expiryWarnedOn` দিয়ে dedupe), আর driver app-এ home screen-এ orange banner।
+
+`expiryBlocked` client-write বন্ধ (rules), না হলে driver নিজেই flag মুছে
+lapsed insurance লুকিয়ে ফেলতে পারত। Admin approve করলে flag clear হয় — অর্থাৎ
+admin নতুন কাগজ দেখে নিশ্চিত হয়েছে। Admin panel-এর Drivers table-এ **Expiry**
+column সবচেয়ে কাছের মেয়াদ দেখায়: লাল = শেষ, হলুদ = ৩০ দিনের ভেতর।
+
+## 7. Payments (Stripe Connect)
+
+**কেন Connect:** টাকা rider → Stripe → driver-এর নিজের account-এ যায়, তোমার
+commission মাঝখানে `application_fee_amount` হিসেবে কেটে যায়। তাই তোমাকে আলাদা
+করে driver-দের টাকা পাঠাতে হয় না, আর তোমার account-এ কারো টাকা জমা থাকে না
+(regulatory ঝামেলা অনেক কম)।
+
+```
+Driver → createDriverPayoutAccount → Stripe Express onboarding (browser)
+                                         │ account.updated webhook
+                                         ▼
+                              drivers/{uid}.payoutsEnabled = true
+
+Rider (trip শেষে) → createRideCheckout → Stripe Checkout page
+                                         │ checkout.session.completed webhook
+                                         ▼
+                              rides/{id}.payment.status = 'paid'
+                              commission → তোমার account
+                              বাকিটা → driver-এর account
+```
+
+**দুটো গুরুত্বপূর্ণ rule:**
+1. `payment.status` **শুধু signature-verified webhook** থেকে set হয় — rider
+   success URL-এ ফিরে এলো মানে টাকা এসেছে, এমন ধরা হয় না।
+2. `drivers.payoutsEnabled` আর `stripeAccountId` client লিখতে পারে না (rules-এ
+   blocked, test করা) — নইলে driver নিজে flag on করে card payment নিতে পারত
+   অথচ Stripe তাকে verify-ই করেনি।
+
+Driver payout setup না করলে checkout fail করে আর rider-কে cash দিতে বলা হয় —
+MVP-তে এটাই intended behaviour।
+
+## 8. Localisation (English + বাংলা)
+
+দুটো app-ই device-এর ভাষা অনুযায়ী **English বা বাংলা** দেখায় — আলাদা setting
+লাগে না, অন্য কোনো ভাষা হলে English-এ পড়ে যায়।
+
+সব string এক জায়গায়: `apps/<app>/lib/l10n/strings.dart`। প্রতিটা লাইনে ইংরেজি আর
+বাংলা পাশাপাশি —
+```dart
+String get bookATaxi => _('Book a taxi', 'ট্যাক্সি বুক করুন');
+```
+`.arb` file + codegen ব্যবহার করিনি: string সংখ্যা কম, build-এ codegen step
+লাগে না, আর দুই অনুবাদ পাশাপাশি থাকায় একটা বদলে অন্যটা বদলাতে ভুলে যাওয়ার
+সুযোগ নেই। Screen-এ ব্যবহার: `final t = Strings.of(context);` তারপর `t.bookATaxi`।
+
+নতুন ভাষা যোগ করতে: `supportedLocales`-এ locale যোগ করে `_()` কে map-based
+করে দিলেই হবে।
+
+**খেয়াল রাখার বিষয়:** `await`-এর পরে `Strings.of(context)` ডাকা যাবে না
+(BuildContext across async gap) — তাই সব async method-এ `final t` আগে ধরে
+রাখা হয়েছে; analyzer এটা ধরিয়ে দেয়।
+
+## 9. Admin panel
+
+Next.js client app — Firebase JS SDK দিয়ে সরাসরি Firestore পড়ে (admin claim
+rules এ check হয়), আর privileged action গুলোতে callable functions ডাকে
+(`adminSetDriverApproval`, `adminSetUserStatus`, `adminGrantAdmin`)। ফলে server
+key Vercel এ রাখতে হয় না — attack surface ছোট।
+
+Pages: Dashboard (**revenue** — তোমার commission ৭ দিনের ও সর্বকালের, আর
+processed fare — সবই Firestore-এর server-side `sum()` aggregation দিয়ে, তাই
+ledger বড় হলেও browser-এ সব entry টানতে হয় না; সাথে aggregate counts), Drivers (approve/reject + live online
+status), Users (search + suspend/reactivate), Rides (live `onSnapshot` feed),
+Pricing (config editor)।
+
+## 10. কেন এই decisions (trade-offs)
+
+| Decision | কারণ |
+|---|---|
+| Maps API বাদ, Google Maps deep-link | £0 cost, zero API-key friction; পরে drop-in upgrade |
+| Native geocoding (`geocoding` pkg) | Address→latlng free, on-device |
+| Callable functions, REST API না | Auth+claims built-in, CORS/token plumbing নেই |
+| Firestore rules এ status machine | Function round-trip ছাড়াই instant, offline-safe transitions |
+| Stripe Checkout, in-app SDK না | flutter_stripe-এর platform config ছাড়াই কাজ করে; hosted page = কম PCI scope |
+| Destination charge (application fee) | Driver payout automatic, তোমার account-এ কারো টাকা জমা থাকে না |

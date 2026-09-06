@@ -1,0 +1,39 @@
+# Node
+node_modules/
+functions/lib/
+.next/
+out/
+*.log
+
+# Env & secrets — never commit
+.env
+.env.*
+!.env.example
+serviceAccountKey*.json
+*-firebase-adminsdk-*.json
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Flutter / Dart
+*.iml
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+apps/*/android/app/google-services.json
+apps/*/ios/Runner/GoogleService-Info.plist
+apps/*/lib/firebase_options.dart
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Firebase emulator artifacts
+firestore-debug.log
+storage-debug.log
